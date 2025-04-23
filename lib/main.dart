@@ -8,9 +8,7 @@ void main() async {
 
   // Initialize any necessary services or plugins here
   // For example, if you are using Firebase, initialize it here
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
 }
 
@@ -19,10 +17,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: MainPage(),
-    );
+    return MaterialApp(debugShowCheckedModeBanner: false, home: MainPage());
   }
 }
-
