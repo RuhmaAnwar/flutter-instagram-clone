@@ -10,7 +10,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-final user = FirebaseAuth.instance.currentUser;
+  final user = FirebaseAuth.instance.currentUser;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -18,22 +19,20 @@ final user = FirebaseAuth.instance.currentUser;
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
-              'Home Page',
-              style: TextStyle(fontSize: 14),
-            ),
+            const Text('Home Page', style: TextStyle(fontSize: 14)),
             const SizedBox(height: 20),
-            
             InstaButton(
-                    text: "Log Out",
-                    isFilled: true,
-                    onPressed: () {
-                      FirebaseAuth.instance.signOut();
-                    },
-                  ),
+              text: "Log Out",
+              isFilled: true,
+              onPressed: () {
+                FirebaseAuth.instance.signOut();
+              },
+            ),
           ],
         ),
-      )
+      ),
+
     );
   }
+
 }

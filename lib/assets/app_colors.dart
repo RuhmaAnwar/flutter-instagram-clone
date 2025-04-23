@@ -8,8 +8,8 @@ class AppColors {
   // Lighter gradient (for backgrounds)
   static const LinearGradient primaryGradientLight = LinearGradient(
     colors: [
-    Color(0xFFB2DFDB), // Much lighter teal
-    Color(0xFFFFCCBC), // Much lighter coral
+    Color.fromARGB(255, 188, 221, 219), // Much lighter teal
+    Color.fromARGB(255, 252, 224, 216), // Much lighter coral
     ],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
