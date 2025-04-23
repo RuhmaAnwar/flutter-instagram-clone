@@ -43,7 +43,11 @@ class _LoginPageState extends State<LoginPage> {
             child: Column( 
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // logo / hello again
+                // vivir icon
+                Image.asset('lib/assets/images/vivir_icon.png',
+                  height: 200,
+                  scale: 2.5,),
+
                 //email / username textfield
                 InstaTextField(
                   controller: _emailController,
