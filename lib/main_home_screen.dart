@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'main_screens/home_page.dart';
-import 'main_screens/profile_page.dart';
+import 'main_screens/profile/profile_page.dart';
 import 'main_screens/add_post.dart';
 import 'main_screens/reels_page.dart';
 import 'main_screens/search_screen.dart';
@@ -14,7 +14,7 @@ class MainHomeScreen extends StatefulWidget {
 class _MainHomeScreenState extends State<MainHomeScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> widgetOptions = const [
+  final List<Widget> widgetOptions =  [
     HomePage(),
     SearchScreen(),
     AddPost(),
@@ -31,10 +31,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        title: const Text('App Bar'),
-      ),
       body: widgetOptions.elementAt(_selectedIndex),
       bottomNavigationBar: BottomNavigationBar(
   showSelectedLabels: false, // Hide selected labels

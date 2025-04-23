@@ -29,14 +29,14 @@ class InstaButton extends StatelessWidget {
         // ignore: deprecated_member_use
         shadowColor: Colors.grey,
         elevation: 5, // More elevation = more 3D
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(10),
         child: ElevatedButton(
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
             backgroundColor: isFilled ? Colors.black : Colors.white,
             foregroundColor: isFilled ? Colors.white : Colors.black,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(10),
             ),
             elevation: 0, // Use PhysicalModel's elevation instead
             padding: const EdgeInsets.symmetric(vertical: 14),
