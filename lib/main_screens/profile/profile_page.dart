@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_instagram_clone/authentication/login_page.dart';
 import 'package:flutter_instagram_clone/custom_widgets/insta_button.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -25,7 +25,6 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> loadUserData() async {
-    await Firebase.initializeApp(); // Ensure Firebase is initialized
     String? userUID = FirebaseAuth.instance.currentUser?.uid;
     if (userUID != null) {
       try {
@@ -42,125 +41,136 @@ class _ProfilePageState extends State<ProfilePage> {
             username = userDoc['Username'];
             isLoading = false;
           });
-        } else {
-          print("No user document found.");
         }
       } catch (e) {
         print("Error fetching user data: $e");
       }
-    } else {
-      print("User not logged in");
     }
+  }
+
+  Future<void> _logout() async {
+    await FirebaseAuth.instance.signOut();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    double buttonWidth = screenWidth * 0.42;
-    double buttonHeight = screenHeight * 0.070;
+    double buttonWidth = screenWidth * 0.40;
+    double buttonHeight = screenHeight * 0.060;
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        flexibleSpace: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Color.fromARGB(255, 252, 224, 216),
-                Color.fromARGB(255, 188, 221, 219),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.topRight,
-            ),
-          ),
-          child: SafeArea(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                username,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+      backgroundColor: Colors.white,
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          : Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
                     children: [
-                      const CircleAvatar(
-                        radius: 60,
-                        backgroundColor: Colors.purpleAccent,
-                        child: Icon(Icons.person, size: 45, color: Colors.white),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '$firstName $lastName',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                      // Custom top header with username
+                      Row(
+                        children: [
+                          Text(
+                            username,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
                             ),
-                            const SizedBox(height: 5),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 0.01),
+
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const CircleAvatar(
+                            radius: 40,
+                            backgroundColor: Colors.grey,
+                            child: Icon(Icons.person, size: 40, color: Colors.white),
+                          ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildStatColumn("10", "Posts"),
-                                _buildStatColumn("200", "Followers"),
-                                _buildStatColumn("20", "Following"),
+                                Text(
+                                  '$firstName $lastName',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(height: 0),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    _buildStatColumn("10", "Posts"),
+                                    _buildStatColumn("200", "Followers"),
+                                    _buildStatColumn("20", "Following"),
+                                  ],
+                                ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 30),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          SizedBox(
+                            width: buttonWidth,
+                            height: buttonHeight,
+                            child: InstaButton(
+                              text: 'Edit Profile',
+                              isFilled: true,
+                              onPressed: () {
+                                print('Edit Profile Clicked');
+                              },
+                            ),
+                          ),
+                          SizedBox(
+                            width: buttonWidth,
+                            height: buttonHeight,
+                            child: InstaButton(
+                              text: 'Share Profile',
+                              isFilled: false,
+                              onPressed: () {
+                                print('Share Profile Clicked');
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 30),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      SizedBox(
-                        width: buttonWidth,
-                        height: buttonHeight,
-                        child: InstaButton(
-                          text: 'Edit Profile',
-                          isFilled: true,
-                          onPressed: () {
-                            print('Edit Profile Clicked');
-                          },
-                        ),
+                ),
+                Positioned(
+                  bottom: 16,
+                  right: 16,
+                  child: GestureDetector(
+                    onTap: _logout,
+                    child: Container(
+                      width: 50,
+                      height: 50,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black87,
                       ),
-                      SizedBox(
-                        width: buttonWidth,
-                        height: buttonHeight,
-                        child: InstaButton(
-                          text: 'Share Profile',
-                          isFilled: false,
-                          onPressed: () {
-                            print('Share Profile Clicked');
-                          },
-                        ),
-                      ),
-                    ],
+                      child: const Icon(Icons.logout, color: Colors.white),
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
     );
   }
@@ -170,12 +180,12 @@ class _ProfilePageState extends State<ProfilePage> {
       children: [
         Text(
           count,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(fontSize: 14, color: Colors.grey),
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
         ),
       ],
     );
