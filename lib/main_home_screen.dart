@@ -31,38 +31,47 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+      backgroundColor: Colors.black,
+      title: Image.asset(
+        'lib/assets/images/vivir_icon.png',
+        height: 60, // adjust as needed
+        color: Colors.white,
+      ),
+    ),
+
       body: widgetOptions.elementAt(_selectedIndex),
       bottomNavigationBar: BottomNavigationBar(
-  showSelectedLabels: false, // Hide selected labels
-  showUnselectedLabels: false, // Hide unselected labels
-  type: BottomNavigationBarType.fixed,
-  selectedItemColor: Colors.black,
-  unselectedItemColor: Colors.blueGrey,
-  items: const <BottomNavigationBarItem>[
-    BottomNavigationBarItem(
-      icon: Icon(Icons.home),
-      label: '', // Remove label
+      showSelectedLabels: false, // Hide selected labels
+      showUnselectedLabels: false, // Hide unselected labels
+      type: BottomNavigationBarType.fixed,
+      selectedItemColor: Colors.black,
+      unselectedItemColor: Colors.blueGrey,
+      items: const <BottomNavigationBarItem>[
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: '', // Remove label
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.search),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.add),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.video_label),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person),
+          label: '',
+        ),
+      ],
+      currentIndex: _selectedIndex,
+      onTap: _onItemTapped,
     ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.search),
-      label: '',
-    ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.add),
-      label: '',
-    ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.video_label),
-      label: '',
-    ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.person),
-      label: '',
-    ),
-  ],
-  currentIndex: _selectedIndex,
-  onTap: _onItemTapped,
-),
     );
   }
 }
