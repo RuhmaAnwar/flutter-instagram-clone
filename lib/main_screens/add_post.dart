@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:video_player/video_player.dart';
 import 'package:image_picker/image_picker.dart';
+import '../assets/app_colors.dart';
 
 class AddPost extends StatefulWidget {
   const AddPost({super.key});
@@ -14,15 +15,15 @@ class AddPost extends StatefulWidget {
 
 class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
   late List<CameraDescription> _cameras;
-  CameraController? _controller;
+  CameraController? _cameraController;
   VideoPlayerController? _videoController;
+  late AnimationController _pulseController;
 
   File? _mediaFile;
   bool _isVideo = false;
   bool _isRecording = false;
   bool _cameraReady = false;
   String? _error;
-  late AnimationController _pulseController;
 
   @override
   void initState() {
@@ -33,39 +34,50 @@ class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
       lowerBound: 1.0,
       upperBound: 1.2,
     )..repeat(reverse: true);
-    _initCamera();
+    _initializeCamera();
   }
 
-  Future<void> _initCamera() async {
+  Future<void> _initializeCamera() async {
     final cameraPermission = await Permission.camera.request();
     final micPermission = await Permission.microphone.request();
 
     if (!cameraPermission.isGranted || !micPermission.isGranted) {
-      setState(() {
-        _error = "Camera or microphone permission not granted.";
-      });
+      setState(() => _error = "Camera or microphone permission not granted.");
       return;
     }
 
     _cameras = await availableCameras();
     if (_cameras.isNotEmpty) {
-      _startCamera(_cameras.first);
+      await _startCamera(_cameras.first);
     }
   }
 
-  Future<void> _startCamera(CameraDescription camera) async {
-    _controller?.dispose();
-    _controller = CameraController(camera, ResolutionPreset.high);
-    await _controller!.initialize();
-    setState(() {
-      _cameraReady = true;
-    });
+Future<void> _startCamera(CameraDescription camera) async {
+  setState(() => _cameraReady = false);
+
+  if (_cameraController != null) {
+    await _cameraController!.dispose();
+    _cameraController = null;
   }
 
+  final controller = CameraController(camera, ResolutionPreset.high);
+
+  try {
+    await controller.initialize();
+    setState(() {
+      _cameraController = controller;
+      _cameraReady = true;
+    });
+  } catch (e) {
+    setState(() => _error = "Camera init error: $e");
+  }
+}
+
+
   Future<void> _takePhoto() async {
-    if (!_cameraReady || _controller == null) return;
+    if (!_cameraReady || _cameraController == null) return;
     try {
-      final file = await _controller!.takePicture();
+      final file = await _cameraController!.takePicture();
       setState(() {
         _mediaFile = File(file.path);
         _isVideo = false;
@@ -75,36 +87,37 @@ class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
     }
   }
 
-  Future<void> _startVideo() async {
-    if (!_cameraReady || _controller == null) return;
+  Future<void> _startVideoRecording() async {
+    if (!_cameraReady || _cameraController == null) return;
     try {
-      await _controller!.startVideoRecording();
-      setState(() {
-        _isRecording = true;
-      });
+      await _cameraController!.startVideoRecording();
+      setState(() => _isRecording = true);
     } catch (e) {
       setState(() => _error = "Video start error: $e");
     }
   }
 
-  Future<void> _stopVideo() async {
-    if (!_isRecording || _controller == null) return;
+  Future<void> _stopVideoRecording() async {
+    if (!_isRecording || _cameraController == null) return;
     try {
-      final file = await _controller!.stopVideoRecording();
+      final file = await _cameraController!.stopVideoRecording();
       setState(() {
-        _isRecording = false;
         _mediaFile = File(file.path);
         _isVideo = true;
+        _isRecording = false;
       });
-      _videoController?.dispose();
-      _videoController = VideoPlayerController.file(_mediaFile!)
-        ..initialize().then((_) {
-          setState(() {});
-          _videoController!.play();
-        });
+      await _initializeVideoPlayer(_mediaFile!);
     } catch (e) {
       setState(() => _error = "Video stop error: $e");
     }
+  }
+
+  Future<void> _initializeVideoPlayer(File file) async {
+    _videoController?.dispose();
+    _videoController = VideoPlayerController.file(file);
+    await _videoController!.initialize();
+    _videoController!.play();
+    setState(() {});
   }
 
   Future<void> _pickFromGallery() async {
@@ -113,8 +126,7 @@ class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
 
     if (picked != null) {
       final file = File(picked.path);
-      final isVideo =
-          picked.path.endsWith('.mp4') || picked.path.endsWith('.mov');
+      final isVideo = picked.path.endsWith('.mp4') || picked.path.endsWith('.mov');
 
       setState(() {
         _mediaFile = file;
@@ -122,19 +134,24 @@ class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
       });
 
       if (isVideo) {
-        _videoController?.dispose();
-        _videoController = VideoPlayerController.file(file)
-          ..initialize().then((_) {
-            setState(() {});
-            _videoController!.play();
-          });
+        await _initializeVideoPlayer(file);
       }
     }
   }
 
+Future<void> _flipCamera() async {
+  if (_cameras.length < 2 || _cameraController == null) return;
+
+  final currentIndex = _cameras.indexOf(_cameraController!.description);
+  final nextIndex = (currentIndex + 1) % _cameras.length;
+
+  await _startCamera(_cameras[nextIndex]);
+}
+
+
   @override
   void dispose() {
-    _controller?.dispose();
+    _cameraController?.dispose();
     _videoController?.dispose();
     _pulseController.dispose();
     super.dispose();
@@ -152,12 +169,10 @@ class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
             if (_mediaFile == null && _cameraReady)
               LayoutBuilder(
                 builder: (context, constraints) {
-                  if (!_controller!.value.isInitialized)
-                    return Container(color: Colors.black);
+                  if (!_cameraController!.value.isInitialized) return Container(color: Colors.black);
 
-                  final previewSize = _controller!.value.previewSize!;
-                  final screenRatio =
-                      constraints.maxWidth / constraints.maxHeight;
+                  final previewSize = _cameraController!.value.previewSize!;
+                  final screenRatio = constraints.maxWidth / constraints.maxHeight;
                   final previewRatio = previewSize.height / previewSize.width;
 
                   return Transform.scale(
@@ -165,25 +180,22 @@ class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
                     child: Center(
                       child: AspectRatio(
                         aspectRatio: previewRatio,
-                        child: CameraPreview(_controller!),
+                        child: CameraPreview(_cameraController!),
                       ),
                     ),
                   );
                 },
               ),
-
             if (_mediaFile != null)
               Center(
-                child:
-                    _isVideo
-                        ? (_videoController != null &&
-                                _videoController!.value.isInitialized)
-                            ? AspectRatio(
-                              aspectRatio: _videoController!.value.aspectRatio,
-                              child: VideoPlayer(_videoController!),
-                            )
-                            : const CircularProgressIndicator()
-                        : Image.file(_mediaFile!),
+                child: _isVideo
+                    ? (_videoController != null && _videoController!.value.isInitialized)
+                        ? AspectRatio(
+                            aspectRatio: _videoController!.value.aspectRatio,
+                            child: VideoPlayer(_videoController!),
+                          )
+                        : const CircularProgressIndicator()
+                    : Image.file(_mediaFile!),
               ),
             Align(
               alignment: Alignment.bottomCenter,
@@ -195,43 +207,28 @@ class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      // Gallery Icon (Left)
+                      // Gallery Icon
                       Positioned(
                         left: 30,
                         child: IconButton(
-                          icon: const Icon(
-                            Icons.photo_library,
-                            color: Colors.white,
-                          ),
+                          icon: const Icon(Icons.photo_library, color: Colors.white),
                           onPressed: _pickFromGallery,
                         ),
                       ),
 
-                      // Capture Button (Center)
+                      // Capture Button
                       GestureDetector(
                         onTap: _takePhoto,
-                        onLongPress: _startVideo,
-                        onLongPressUp: _stopVideo,
+                        onLongPress: _startVideoRecording,
+                        onLongPressUp: _stopVideoRecording,
                         child: ShaderMask(
                           shaderCallback: (Rect bounds) {
-                            return const LinearGradient(
-                              colors: [
-                                Color(0xFFFFFFFF),
-                                Color(0xFF006262),
-                                Color(0xFFFF7F50),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ).createShader(bounds);
+                            return AppColors.primaryGradientDark.createShader(bounds);
                           },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 300),
-                            width:
-                                70 *
-                                (_isRecording ? _pulseController.value : 1.0),
-                            height:
-                                70 *
-                                (_isRecording ? _pulseController.value : 1.0),
+                            width: 70 * borderScale,
+                            height: 70 * borderScale,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(color: Colors.white, width: 4),
@@ -240,23 +237,12 @@ class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
                         ),
                       ),
 
-                      // Flip Camera Icon (Right)
+                      // Flip Camera Icon
                       Positioned(
                         right: 30,
                         child: IconButton(
-                          icon: const Icon(
-                            Icons.flip_camera_android,
-                            color: Colors.white,
-                          ),
-                          onPressed: () {
-                            if (_cameras.length > 1) {
-                              final nextIndex =
-                                  (_cameras.indexOf(_controller!.description) +
-                                      1) %
-                                  _cameras.length;
-                              _startCamera(_cameras[nextIndex]);
-                            }
-                          },
+                          icon: const Icon(Icons.flip_camera_android, color: Colors.white),
+                          onPressed: _flipCamera,
                         ),
                       ),
                     ],
