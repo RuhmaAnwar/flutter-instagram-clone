@@ -4,7 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:video_player/video_player.dart';
 import 'package:image_picker/image_picker.dart';
-import '../assets/app_colors.dart';
+import '../theme/colors.dart';
 
 class AddPost extends StatefulWidget {
   const AddPost({super.key});
@@ -52,27 +52,26 @@ class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
     }
   }
 
-Future<void> _startCamera(CameraDescription camera) async {
-  setState(() => _cameraReady = false);
+  Future<void> _startCamera(CameraDescription camera) async {
+    setState(() => _cameraReady = false);
 
-  if (_cameraController != null) {
-    await _cameraController!.dispose();
-    _cameraController = null;
+    if (_cameraController != null) {
+      await _cameraController!.dispose();
+      _cameraController = null;
+    }
+
+    final controller = CameraController(camera, ResolutionPreset.high);
+
+    try {
+      await controller.initialize();
+      setState(() {
+        _cameraController = controller;
+        _cameraReady = true;
+      });
+    } catch (e) {
+      setState(() => _error = "Camera init error: $e");
+    }
   }
-
-  final controller = CameraController(camera, ResolutionPreset.high);
-
-  try {
-    await controller.initialize();
-    setState(() {
-      _cameraController = controller;
-      _cameraReady = true;
-    });
-  } catch (e) {
-    setState(() => _error = "Camera init error: $e");
-  }
-}
-
 
   Future<void> _takePhoto() async {
     if (!_cameraReady || _cameraController == null) return;
@@ -139,15 +138,14 @@ Future<void> _startCamera(CameraDescription camera) async {
     }
   }
 
-Future<void> _flipCamera() async {
-  if (_cameras.length < 2 || _cameraController == null) return;
+  Future<void> _flipCamera() async {
+    if (_cameras.length < 2 || _cameraController == null) return;
 
-  final currentIndex = _cameras.indexOf(_cameraController!.description);
-  final nextIndex = (currentIndex + 1) % _cameras.length;
+    final currentIndex = _cameras.indexOf(_cameraController!.description);
+    final nextIndex = (currentIndex + 1) % _cameras.length;
 
-  await _startCamera(_cameras[nextIndex]);
-}
-
+    await _startCamera(_cameras[nextIndex]);
+  }
 
   @override
   void dispose() {
@@ -160,16 +158,20 @@ Future<void> _flipCamera() async {
   @override
   Widget build(BuildContext context) {
     final borderScale = _isRecording ? _pulseController.value : 1.0;
+    bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.black,
       body: SafeArea(
         child: Stack(
           children: [
             if (_mediaFile == null && _cameraReady)
               LayoutBuilder(
                 builder: (context, constraints) {
-                  if (!_cameraController!.value.isInitialized) return Container(color: Colors.black);
+                  if (!_cameraController!.value.isInitialized) {
+                    return Container(
+                      color: Theme.of(context).colorScheme.background,
+                    );
+                  }
 
                   final previewSize = _cameraController!.value.previewSize!;
                   final screenRatio = constraints.maxWidth / constraints.maxHeight;
@@ -211,7 +213,10 @@ Future<void> _flipCamera() async {
                       Positioned(
                         left: 30,
                         child: IconButton(
-                          icon: const Icon(Icons.photo_library, color: Colors.white),
+                          icon: Icon(
+                            Icons.photo_library,
+                            color: isDarkMode ? Colors.white : AppColors.textPrimaryLight,
+                          ),
                           onPressed: _pickFromGallery,
                         ),
                       ),
@@ -223,7 +228,7 @@ Future<void> _flipCamera() async {
                         onLongPressUp: _stopVideoRecording,
                         child: ShaderMask(
                           shaderCallback: (Rect bounds) {
-                            return AppColors.primaryGradientDark.createShader(bounds);
+                            return AppColors.primaryGradient.createShader(bounds);
                           },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 300),
@@ -231,7 +236,10 @@ Future<void> _flipCamera() async {
                             height: 70 * borderScale,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 4),
+                              border: Border.all(
+                                color: isDarkMode ? Colors.white : AppColors.textPrimaryLight,
+                                width: 4,
+                              ),
                             ),
                           ),
                         ),
@@ -241,7 +249,10 @@ Future<void> _flipCamera() async {
                       Positioned(
                         right: 30,
                         child: IconButton(
-                          icon: const Icon(Icons.flip_camera_android, color: Colors.white),
+                          icon: Icon(
+                            Icons.flip_camera_android,
+                            color: isDarkMode ? Colors.white : AppColors.textPrimaryLight,
+                          ),
                           onPressed: _flipCamera,
                         ),
                       ),
@@ -258,7 +269,9 @@ Future<void> _flipCamera() async {
                 right: 20,
                 child: Text(
                   _error!,
-                  style: const TextStyle(color: Colors.red),
+                  style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                   textAlign: TextAlign.center,
                 ),
               ),

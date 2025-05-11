@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-
+import 'package:flutter_instagram_clone/theme/colors.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 class InstaButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
@@ -14,39 +15,45 @@ class InstaButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    double screenWidth = MediaQuery.of(context).size.width;
-    double screenHeight = MediaQuery.of(context).size.height;
 
-    double buttonWidth = screenHeight * 0.12 + screenWidth * 0.64;
-    double buttonHeight = (screenHeight * 0.057 + screenWidth * 0.117) / 2;
-    double fontSize = (screenWidth * 0.04 + screenHeight * 0.023) / 2;
+    double buttonWidth = 343.w;
+    double buttonHeight = 44.h;
+    double fontSize =  14.sp;
+
+    bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    Color borderColor = isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    Color shadowColor = isDarkMode ? Colors.grey[800]! : Colors.grey[400]!;
 
     return SizedBox(
       height: buttonHeight,
       width: buttonWidth,
       child: PhysicalModel(
-        color: isFilled ? Colors.black : Colors.white,
-        // ignore: deprecated_member_use
-        shadowColor: Colors.grey,
-        elevation: 5, // More elevation = more 3D
-        borderRadius: BorderRadius.circular(10),
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: isFilled ? Colors.black : Colors.white,
-            foregroundColor: isFilled ? Colors.white : Colors.black,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            elevation: 0, // Use PhysicalModel's elevation instead
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shadowColor: Colors.grey, // shadow comes from PhysicalModel
+        color: Colors.transparent,
+        shadowColor: shadowColor,
+        elevation: 5,
+        borderRadius: BorderRadius.circular(8.r), // Responsive border radius
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: isFilled ? AppColors.primaryGradient : null,
+            color: isFilled ? null : Colors.transparent,
+            border: isFilled ? null : Border.all(color: borderColor),
+            borderRadius: BorderRadius.circular(8.r),
           ),
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.normal,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onPressed,
+              borderRadius: BorderRadius.circular(8.r),
+              child: Center(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.normal,
+                    color: isFilled ? Colors.white : (isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+                  ),
+                ),
+              ),
             ),
           ),
         ),

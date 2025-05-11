@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_instagram_clone/custom_widgets/insta_button.dart';
+import '../theme/colors.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -15,24 +16,30 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('Home Page', style: TextStyle(fontSize: 14)),
-            const SizedBox(height: 20),
-            InstaButton(
-              text: "Log Out",
-              isFilled: true,
-              onPressed: () {
-                FirebaseAuth.instance.signOut();
-              },
-            ),
-          ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: AppColors.primaryGradient, // Match login page background
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Home Page',
+                style: Theme.of(context).textTheme.displayLarge, // Use theme typography
+              ),
+              const SizedBox(height: 20),
+              InstaButton(
+                text: "Log Out",
+                isFilled: true,
+                onPressed: () {
+                  FirebaseAuth.instance.signOut();
+                },
+              ),
+            ],
+          ),
         ),
       ),
-
     );
   }
-
 }

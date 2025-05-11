@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-
+import '../theme/colors.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 class InstaTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final bool obscureText;
   final double? width;
+  final Widget? prefixIcon;
 
   const InstaTextField({
     Key? key,
@@ -12,16 +14,17 @@ class InstaTextField extends StatelessWidget {
     required this.hintText,
     this.obscureText = false,
     this.width,
+    this.prefixIcon,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    double screenWidth = MediaQuery.of(context).size.width;
-    double screenHeight = MediaQuery.of(context).size.height;
-    
-    double fontSize = (screenWidth * 0.047 + screenHeight * 0.03) / 2; // Combines both
-    double inputWidth = width ?? (screenHeight * 0.12 + screenWidth * 0.64); // Default 85% of width
-    double inputHeight = (screenHeight * 0.08 + screenWidth * 0.14) / 2; // Uses both
+
+    double fontSize = 14.sp;
+    double inputWidth = 343.w;
+    double inputHeight = 44.h;
+
+    bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return SizedBox(
       width: inputWidth,
@@ -29,25 +32,18 @@ class InstaTextField extends StatelessWidget {
       child: TextField(
         controller: controller,
         obscureText: obscureText,
-        style: TextStyle(color: Colors.black, fontSize: fontSize),
+        style: TextStyle(
+          color: isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+          fontSize: fontSize,
+        ),
         decoration: InputDecoration(
+          contentPadding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 13.5.h),
           hintText: hintText,
-          hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: fontSize * 0.9),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: EdgeInsets.symmetric(vertical: inputHeight * 0.2, horizontal: 14),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: Colors.grey.shade300),
+          hintStyle: TextStyle(
+            color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            fontSize: fontSize,
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: Colors.grey.shade500),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
+          prefixIcon: prefixIcon,
         ),
       ),
     );
