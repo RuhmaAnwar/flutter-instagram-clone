@@ -5,6 +5,7 @@ import 'main_screens/add_post.dart';
 import 'main_screens/reels_page.dart';
 import 'main_screens/search_screen.dart';
 import '../theme/colors.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class MainHomeScreen extends StatefulWidget {
   const MainHomeScreen({super.key});
@@ -32,23 +33,28 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    double logoFontSize = 30.sp;
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       appBar: AppBar(
-        title: Image.asset(
-          'lib/assets/images/vivir_icon.png',
-          height: 60,
-          color: isDarkMode ? Colors.white : AppColors.primaryTeal, // Match login page logo color
-        ),
-      ),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text(
+                    'Vivir',
+                    style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                          color: Theme.of(context).colorScheme.onPrimary,
+                          fontFamily: 'Pacifico',
+                          fontSize: logoFontSize, // Responsive font size
+                        ),
+                  ),
+                ),
+
       body: widgetOptions.elementAt(_selectedIndex),
       bottomNavigationBar: BottomNavigationBar(
         showSelectedLabels: false,
         showUnselectedLabels: false,
         type: BottomNavigationBarType.fixed,
         backgroundColor: Theme.of(context).colorScheme.surface,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
+        selectedItemColor: Theme.of(context).colorScheme.onPrimary,
         unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(

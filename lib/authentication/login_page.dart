@@ -152,7 +152,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     GestureDetector(
                       onTap: () {
-                        // Forgot Password Screen
+                        // signup
                       },
                       child: Text(
                         'Sign up',
@@ -165,11 +165,12 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
                 SizedBox(height: 40.h),
+
+                // Debug login button
                  Padding(
                   padding: EdgeInsets.only(bottom: 24.h),
                   child: TextButton(
                     onPressed: () {
-                      // Debug login with test credentials
                       _emailController.text = "ruhma@gmail.com";
                       _passwordController.text = "password123";
                       logIn();
@@ -185,6 +186,8 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ),
+
+                
               ],
             ),
           ),

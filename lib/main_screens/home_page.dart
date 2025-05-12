@@ -17,9 +17,9 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.primaryGradient, // Match login page background
-        ),
+        // decoration: const BoxDecoration(
+        //   gradient: AppColors.primaryGradient, 
+        // ),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

@@ -13,9 +13,9 @@ class _ReelsPageState extends State<ReelsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.primaryGradient, // Match login page background
-        ),
+        // decoration: const BoxDecoration(
+        //   gradient: AppColors.primaryGradient, // Match login page background
+        // ),
         child: Center(
           child: Text(
             'Reels Page',

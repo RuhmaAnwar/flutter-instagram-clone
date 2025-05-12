@@ -67,9 +67,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.primaryGradient, // Match login page background
-        ),
+        // decoration: const BoxDecoration(
+        //   gradient: AppColors.primaryGradient, // Match login page background
+        // ),
         child: isLoading
             ? Center(
                 child: CircularProgressIndicator(

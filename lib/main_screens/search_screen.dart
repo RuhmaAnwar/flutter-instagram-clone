@@ -26,9 +26,9 @@ class _SearchScreenState extends State<SearchScreen> {
         automaticallyImplyLeading: false, // No back button
       ),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.primaryGradient, // Match login page background
-        ),
+        // decoration: const BoxDecoration(
+        //   gradient: AppColors.primaryGradient, // Match login page background
+        // ),
         child: Column(
           children: [
             Padding(
