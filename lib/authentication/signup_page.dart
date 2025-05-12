@@ -1,59 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter/material.dart';
 import '../custom_widgets/insta_textfield.dart';
 import '../custom_widgets/insta_button.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../theme/colors.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'signup_page.dart';
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({Key? key}) : super(key: key);
+class SignupPage extends StatefulWidget {
+  const SignupPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<SignupPage> createState() => _SignupPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
-  // Text controllers
+class _SignupPageState extends State<SignupPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  Future logIn() async {
-    await FirebaseAuth.instance.signInWithEmailAndPassword(
-      email: _emailController.text.trim(),
-      password: _passwordController.text.trim(),
-    );
-  }
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
-    double logoFontSize = 64.sp; // Responsive font size
+
     return Scaffold(
       body: SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
+        child: SingleChildScrollView(
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 SizedBox(height: 120.h,),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 96.w,),
-                  child: Text(
-                    'Vivir',
-                    style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                          color: Theme.of(context).colorScheme.onPrimary,
-                          fontFamily: 'Pacifico',
-                          fontSize: logoFontSize, // Responsive font size
-                        ),
-                  ),
-                ),
-                SizedBox(height: 42.h),
           
                 // Email / username textfield
                 InstaTextField(
@@ -93,10 +65,10 @@ class _LoginPageState extends State<LoginPage> {
           
                 // Login button
                 InstaButton(
-                  text: 'Log in',
+                  text: 'Sign Up',
                   isFilled: true,
                   onPressed: () {
-                    logIn();
+                    
                   },
                 ),
                 SizedBox(height: 12.h),
@@ -139,65 +111,11 @@ class _LoginPageState extends State<LoginPage> {
 
                 
                 SizedBox(height: 12.h),
-          
-                // Create new account
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "Don't have an account? ",
-                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            color: Theme.of(context).colorScheme.onSecondaryFixed,
-                            fontSize: 14.sp,
-                          ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        // signup
-                        Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => SignupPage()),
-                       );
-                      },
-                      child: Text(
-                        'Sign up',
-                        style: Theme.of(context).textTheme.displayLarge!.copyWith(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontSize: 14.sp,
-                            ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 40.h),
+              ],)
 
-                // Debug login button
-                 Padding(
-                  padding: EdgeInsets.only(bottom: 24.h),
-                  child: TextButton(
-                    onPressed: () {
-                      _emailController.text = "ruhma@gmail.com";
-                      _passwordController.text = "password123";
-                      logIn();
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.red,
-                    ),
-                    child: Text(
-                      'Debug Login',
-                      style: TextStyle(
-                        fontSize: 12.sp,
-                      ),
-                    ),
-                  ),
-                ),
+      ),
+      ),
 
-                
-              ],
-            ),
-          ),
-        ),
-      
     );
   }
 }
