@@ -24,7 +24,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.flutter_instagram_clone"
-        minSdk = 23  
+        minSdk = 24 
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

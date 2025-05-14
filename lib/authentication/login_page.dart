@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../custom_widgets/insta_textfield.dart';
 import '../custom_widgets/insta_button.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../theme/colors.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'signup_page.dart';
 

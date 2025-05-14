@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'main_screens/home_page.dart';
 import 'main_screens/profile/profile_page.dart';
 import 'main_screens/add_post.dart';
-import 'main_screens/reels_page.dart';
+import 'main_screens/chat_page.dart';
 import 'main_screens/search_screen.dart';
-import '../theme/colors.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class MainHomeScreen extends StatefulWidget {
@@ -21,7 +20,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     const HomePage(),
     const SearchScreen(),
     const AddPost(),
-    const ReelsPage(),
+    const ChatPage(),
     const ProfilePage(),
   ];
 
@@ -34,7 +33,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   @override
   Widget build(BuildContext context) {
     double logoFontSize = 30.sp;
-    bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    //bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -70,7 +69,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
             label: '',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.video_label),
+            icon: Icon(Icons.chat_bubble),
             label: '',
           ),
           BottomNavigationBarItem(
