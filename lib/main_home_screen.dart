@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'main_screens/home_page.dart';
-import 'main_screens/profile/profile_page.dart';
 import 'main_screens/add_post.dart';
-import 'main_screens/chat_page.dart';
+import 'main_screens/reels_page.dart';
 import 'main_screens/search_screen.dart';
+import 'main_screens/profile_page.dart';
+import '../theme/colors.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class MainHomeScreen extends StatefulWidget {
@@ -20,7 +21,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     const HomePage(),
     const SearchScreen(),
     const AddPost(),
-    const ChatPage(),
+    const ReelsPage(),
     const ProfilePage(),
   ];
 
@@ -33,27 +34,26 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   @override
   Widget build(BuildContext context) {
     double logoFontSize = 30.sp;
-    //bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.surface,
         title: Text(
-                    'Vivir',
-                    style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                          color: Theme.of(context).colorScheme.onPrimary,
-                          fontFamily: 'Pacifico',
-                          fontSize: logoFontSize, // Responsive font size
-                        ),
-                  ),
-                ),
-
+          'Vivir',
+          style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                color: isDarkMode ? Colors.white : Colors.black,
+                fontFamily: 'Pacifico',
+                fontSize: logoFontSize,
+              ),
+        ),
+      ),
       body: widgetOptions.elementAt(_selectedIndex),
       bottomNavigationBar: BottomNavigationBar(
         showSelectedLabels: false,
         showUnselectedLabels: false,
         type: BottomNavigationBarType.fixed,
         backgroundColor: Theme.of(context).colorScheme.surface,
-        selectedItemColor: Theme.of(context).colorScheme.onPrimary,
+        selectedItemColor: isDarkMode ? Colors.white : Colors.black,
         unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
@@ -69,7 +69,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
             label: '',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble),
+            icon: Icon(Icons.video_label),
             label: '',
           ),
           BottomNavigationBarItem(

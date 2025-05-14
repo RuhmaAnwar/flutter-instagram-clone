@@ -33,7 +33,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    double logoFontSize = 64.sp; // Responsive font size
+    double logoFontSize = 64.sp; // Responsive font size 
     return Scaffold(
       body: SafeArea(
           child: SingleChildScrollView(
@@ -54,7 +54,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 SizedBox(height: 42.h),
           
-                // Email / username textfield
+                // Email & username textfield
                 InstaTextField(
                   controller: _emailController,
                   hintText: 'Email ',
