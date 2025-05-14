@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/colors.dart';
 
 class ReelsPage extends StatefulWidget {
   const ReelsPage({super.key});

@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_instagram_clone/custom_widgets/insta_button.dart';
-import '../theme/colors.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});

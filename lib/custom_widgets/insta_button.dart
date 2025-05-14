@@ -3,7 +3,7 @@ import 'package:flutter_instagram_clone/theme/colors.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 class InstaButton extends StatelessWidget {
   final String text;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final bool isFilled;
 
   const InstaButton({

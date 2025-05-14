@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../custom_widgets/insta_textfield.dart';
 import '../custom_widgets/insta_button.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../theme/colors.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'signup_page.dart';
 
@@ -34,7 +33,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    double logoFontSize = 64.sp; // Responsive font size
+    double logoFontSize = 64.sp; // Responsive font size 
     return Scaffold(
       body: SafeArea(
           child: SingleChildScrollView(
@@ -55,7 +54,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 SizedBox(height: 42.h),
           
-                // Email / username textfield
+                // Email & username textfield
                 InstaTextField(
                   controller: _emailController,
                   hintText: 'Email ',
