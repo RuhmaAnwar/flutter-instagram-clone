@@ -337,7 +337,7 @@ class _SignupPageState extends State<SignupPage> {
                         : DateFormat('MMMM dd, yyyy').format(_selectedDate!),
                     style: TextStyle(
                       fontSize: 16.sp,
-                      color: _selectedDate == null ? Colors.grey[500] : (isDarkMode ? Colors.white : Colors.black),
+                      color: _selectedDate == null ? Colors.grey[500] : (isDarkMode ? Colors.grey : Colors.black),
                     ),
                   ),
                 ),
