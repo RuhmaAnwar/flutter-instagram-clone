@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_instagram_clone/main_screens/chat_page.dart';
 import 'main_screens/home_page.dart';
 import 'main_screens/add_post.dart';
+import 'main_screens/chat_page.dart';
 import 'main_screens/search_screen.dart';
 import 'main_screens/profile_page.dart';
 import '../theme/colors.dart';

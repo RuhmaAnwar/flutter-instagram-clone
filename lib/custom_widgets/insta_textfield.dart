@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 class InstaTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final bool obscureText;
   final double? width;
   final Widget? prefixIcon;
+  final InputDecoration? decoration;
+  final ValueChanged<String>? onChanged; // Added onChanged callback
 
   const InstaTextField({
     Key? key,
@@ -15,13 +18,14 @@ class InstaTextField extends StatelessWidget {
     this.obscureText = false,
     this.width,
     this.prefixIcon,
+    this.decoration,
+    this.onChanged, // Initialized as optional
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-
     double fontSize = 14.sp;
-    double inputWidth = 343.w;
+    double inputWidth = width ?? 343.w;
     double inputHeight = 44.h;
 
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -36,7 +40,7 @@ class InstaTextField extends StatelessWidget {
           color: isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
           fontSize: fontSize,
         ),
-        decoration: InputDecoration(
+        decoration: decoration ?? InputDecoration(
           contentPadding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 13.5.h),
           hintText: hintText,
           hintStyle: TextStyle(
@@ -44,7 +48,26 @@ class InstaTextField extends StatelessWidget {
             fontSize: fontSize,
           ),
           prefixIcon: prefixIcon,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8.r),
+            borderSide: BorderSide(
+              color: isDarkMode ? AppColors.greyBorderDark : AppColors.greyBorderLight,
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8.r),
+            borderSide: BorderSide(
+              color: isDarkMode ? AppColors.greyBorderDark : AppColors.greyBorderLight,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8.r),
+            borderSide: BorderSide(
+              color: isDarkMode ? AppColors.greyBorderDark : AppColors.greyBorderLight,
+            ),
+          ),
         ),
+        onChanged: onChanged, // Pass the onChanged callback to TextField
       ),
     );
   }
