@@ -10,6 +10,7 @@ import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:photo_view/photo_view.dart'; // Add this dependency for zooming
 import '../theme/colors.dart';
 
 class ChatRoomPage extends StatefulWidget {
@@ -131,6 +132,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
         'seenBy': {_auth.currentUser!.uid: true},
         'mediaType': mediaType,
         'mediaUrl': mediaUrl,
+        'isDeletedFor': [],
       });
 
       final currentDoc = await _firestore.collection('chats').doc(chatRoomId).get();
@@ -188,6 +190,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       'seenBy': {_auth.currentUser!.uid: true},
       'mediaType': mediaType,
       'mediaUrl': mediaUrl,
+      'isDeletedFor': [],
     });
 
     await _firestore.collection('chats').doc(chatRoomId).set({
@@ -240,6 +243,98 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
   Future<void> _playAudio(String url) async {
     await _audioPlayer.play(UrlSource(url));
+  }
+
+  Future<void> _deleteMessage(String messageId, {bool forEveryone = false}) async {
+    final chatRoomId = _getChatRoomId();
+    final messageRef = _firestore.collection('chats').doc(chatRoomId).collection('messages').doc(messageId);
+    final messageDoc = await messageRef.get();
+    if (!messageDoc.exists) return;
+
+    final messageData = messageDoc.data()!;
+    final timestamp = (messageData['timestamp'] as Timestamp?)?.toDate();
+    final senderId = messageData['senderId'] as String;
+
+    // Only the sender can delete for everyone, and only within 1 hour of sending
+    if (forEveryone) {
+      if (senderId != _auth.currentUser!.uid) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Only the sender can delete for everyone')),
+        );
+        return;
+      }
+      if (timestamp != null && DateTime.now().difference(timestamp).inHours > 1) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You can only delete for everyone within 1 hour')),
+        );
+        return;
+      }
+      await messageRef.delete();
+      // Update last message in chat room
+      final messagesSnapshot = await _firestore
+          .collection('chats')
+          .doc(chatRoomId)
+          .collection('messages')
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .get();
+      if (messagesSnapshot.docs.isNotEmpty) {
+        final lastMessage = messagesSnapshot.docs.first.data();
+        await _firestore.collection('chats').doc(chatRoomId).update({
+          'lastMessage': lastMessage['text'].isNotEmpty ? lastMessage['text'] : lastMessage['mediaType'] == 'image' ? 'Image' : 'Audio',
+          'lastTimestamp': lastMessage['timestamp'],
+        });
+      } else {
+        await _firestore.collection('chats').doc(chatRoomId).update({
+          'lastMessage': '',
+          'lastTimestamp': null,
+        });
+      }
+    } else {
+      // Delete for self by adding user ID to isDeletedFor list
+      await messageRef.update({
+        'isDeletedFor': FieldValue.arrayUnion([_auth.currentUser!.uid]),
+      });
+    }
+  }
+
+  void _showDeleteOptions(String messageId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Message'),
+        content: const Text('Choose an option:'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteMessage(messageId, forEveryone: false);
+            },
+            child: const Text('Delete for Me'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteMessage(messageId, forEveryone: true);
+            },
+            child: const Text('Delete for Everyone'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFullScreenImage(String imageUrl) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FullScreenImage(imageUrl: imageUrl),
+      ),
+    );
   }
 
   @override
@@ -301,83 +396,111 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                     final isSeen = seenBy[widget.userId] == true && isCurrentUser;
                     final timestamp = (message['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
                     final mediaUrl = message['mediaUrl'] as String?;
+                    final data = message.data() as Map<String, dynamic>;
+                    final isDeletedFor = data.containsKey('isDeletedFor') ? (data['isDeletedFor'] as List<dynamic>?) ?? [] : [];
 
-                    return Padding(
-                      padding: EdgeInsets.symmetric(vertical: 4.h),
-                      child: Align(
-                        alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Column(
-                          crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                          children: [
-                            if (message['mediaType'] == 'image')
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12.r),
-                                child: Image.network(
-                                  mediaUrl!,
-                                  width: 200.w,
-                                  height: 200.h,
-                                  fit: BoxFit.cover,
-                                  loadingBuilder: (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return Center(
-                                      child: CircularProgressIndicator(
-                                        value: loadingProgress.expectedTotalBytes != null
-                                            ? loadingProgress.cumulativeBytesLoaded /
-                                                (loadingProgress.expectedTotalBytes ?? 1)
-                                            : null,
-                                      ),
-                                    );
-                                  },
-                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.error),
+                    // Skip rendering if message is deleted for the current user
+                    if (isDeletedFor.contains(_auth.currentUser!.uid)) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return GestureDetector(
+                      onLongPress: () => _showDeleteOptions(message.id),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4.h),
+                        child: Align(
+                          alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Column(
+                            crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            children: [
+                              if (message['mediaType'] == 'image')
+                                GestureDetector(
+                                  onTap: () => _showFullScreenImage(mediaUrl!),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    child: Image.network(
+                                      mediaUrl ?? '',
+                                      width: 200.w,
+                                      height: 200.h,
+                                      fit: BoxFit.cover,
+                                      loadingBuilder: (context, child, loadingProgress) {
+                                        if (loadingProgress == null) return child;
+                                        return Center(
+                                          child: CircularProgressIndicator(
+                                            value: loadingProgress.expectedTotalBytes != null
+                                                ? loadingProgress.cumulativeBytesLoaded /
+                                                    (loadingProgress.expectedTotalBytes ?? 1)
+                                                : null,
+                                          ),
+                                        );
+                                      },
+                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.error),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            if (message['mediaType'] != 'image')
-                              ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxWidth: MediaQuery.of(context).size.width * 0.75,
-                                ),
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                                  decoration: BoxDecoration(
-                                    color: isCurrentUser
-                                        ? AppColors.primaryTeal
-                                        : isDarkMode
-                                            ? AppColors.greyDark
-                                            : AppColors.greyLight,
-                                    border: Border.all(
+                              if (message['mediaType'] != 'image')
+                                ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: MediaQuery.of(context).size.width * 0.75,
+                                  ),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                                    decoration: BoxDecoration(
                                       color: isCurrentUser
                                           ? AppColors.primaryTeal
                                           : isDarkMode
-                                              ? AppColors.greyBorderDark
-                                              : AppColors.greyBorderLight,
-                                      width: 1.5.w,
+                                              ? AppColors.greyDark
+                                              : AppColors.greyLight,
+                                      border: Border.all(
+                                        color: isCurrentUser
+                                            ? AppColors.primaryTeal
+                                            : isDarkMode
+                                                ? AppColors.greyBorderDark
+                                                : AppColors.greyBorderLight,
+                                        width: 1.5.w,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12.r),
                                     ),
-                                    borderRadius: BorderRadius.circular(12.r),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                    children: [
-                                      if (message['mediaType'] == 'audio')
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            IconButton(
-                                              icon: Icon(
-                                                Icons.play_arrow,
-                                                size: 24.sp,
-                                                color: isCurrentUser
-                                                    ? Colors.white
-                                                    : isDarkMode
-                                                        ? AppColors.greyBorderDark
-                                                        : AppColors.greyBorderLight,
+                                    child: Column(
+                                      crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                      children: [
+                                        if (message['mediaType'] == 'audio')
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                icon: Icon(
+                                                  Icons.play_arrow,
+                                                  size: 24.sp,
+                                                  color: isCurrentUser
+                                                      ? Colors.white
+                                                      : isDarkMode
+                                                          ? AppColors.greyBorderDark
+                                                          : AppColors.greyBorderLight,
+                                                ),
+                                                onPressed: () => _playAudio(mediaUrl!),
+                                                padding: EdgeInsets.zero,
+                                                constraints: BoxConstraints(),
                                               ),
-                                              onPressed: () => _playAudio(mediaUrl!),
-                                              padding: EdgeInsets.zero,
-                                              constraints: BoxConstraints(),
-                                            ),
-                                            SizedBox(width: 8.w),
-                                            Text(
-                                              '1:02',
+                                              SizedBox(width: 8.w),
+                                              Text(
+                                                '1:02',
+                                                style: TextStyle(
+                                                  color: isCurrentUser
+                                                      ? Colors.white
+                                                      : isDarkMode
+                                                          ? AppColors.textPrimaryDark
+                                                          : AppColors.textPrimaryLight,
+                                                  fontSize: 14.sp,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        if (message['text'] != null && message['text'].isNotEmpty)
+                                          Padding(
+                                            padding: EdgeInsets.only(top: message['mediaType'] != 'text' ? 8.h : 0),
+                                            child: Text(
+                                              message['text'],
                                               style: TextStyle(
                                                 color: isCurrentUser
                                                     ? Colors.white
@@ -387,47 +510,32 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                                                 fontSize: 14.sp,
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                      if (message['text'] != null && message['text'].isNotEmpty)
-                                        Padding(
-                                          padding: EdgeInsets.only(top: message['mediaType'] != 'text' ? 8.h : 0),
-                                          child: Text(
-                                            message['text'],
-                                            style: TextStyle(
-                                              color: isCurrentUser
-                                                  ? Colors.white
-                                                  : isDarkMode
-                                                      ? AppColors.textPrimaryDark
-                                                      : AppColors.textPrimaryLight,
-                                              fontSize: 14.sp,
-                                            ),
                                           ),
-                                        ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                            if (isSeen)
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  top: 2.h,
-                                  left: isCurrentUser ? 0 : 16.w,
-                                  right: isCurrentUser ? 16.w : 0,
-                                ),
-                                child: Text(
-                                  'Seen at ${timestamp.toLocal().toString().substring(0, 16)}',
-                                  style: TextStyle(
-                                    fontSize: 10.sp,
-                                    color: isCurrentUser
-                                        ? Colors.white70
-                                        : isDarkMode
-                                            ? AppColors.greyBorderDark
-                                            : AppColors.greyBorderLight,
+                              if (isSeen)
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                    top: 2.h,
+                                    left: isCurrentUser ? 0 : 16.w,
+                                    right: isCurrentUser ? 16.w : 0,
+                                  ),
+                                  child: Text(
+                                    'Seen at ${timestamp.toLocal().toString().substring(0, 16)}',
+                                    style: TextStyle(
+                                      fontSize: 10.sp,
+                                      color: isCurrentUser
+                                          ? Colors.white70
+                                          : isDarkMode
+                                              ? AppColors.greyBorderDark
+                                              : AppColors.greyBorderLight,
+                                    ),
                                   ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -571,6 +679,44 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                   ),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class FullScreenImage extends StatelessWidget {
+  final String imageUrl;
+
+  const FullScreenImage({Key? key, required this.imageUrl}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: isDarkMode ? AppColors.backgroundDark : AppColors.backgroundLight,
+      body: Stack(
+        children: [
+          Center(
+            child: PhotoView(
+              imageProvider: NetworkImage(imageUrl),
+              minScale: PhotoViewComputedScale.contained,
+              maxScale: PhotoViewComputedScale.covered * 2,
+              initialScale: PhotoViewComputedScale.contained,
+              backgroundDecoration: BoxDecoration(
+                color: isDarkMode ? AppColors.backgroundDark : AppColors.backgroundLight,
+              ),
+            ),
+          ),
+          Positioned(
+            top: 40.h,
+            left: 16.w,
+            child: IconButton(
+              icon: Icon(Icons.close, size: 28.sp, color: isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+              onPressed: () => Navigator.pop(context),
             ),
           ),
         ],
