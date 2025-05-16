@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '/chat_room_page.dart'; 
+import '/chat_room_page.dart';
 import '../theme/colors.dart';
+import '../custom_widgets/insta_textfield.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -16,6 +17,7 @@ class _ChatPageState extends State<ChatPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
   List<QueryDocumentSnapshot> _users = [];
   bool _isLoading = true;
   bool _isFetchingMore = false;
@@ -29,46 +31,28 @@ class _ChatPageState extends State<ChatPage> {
     _scrollController.addListener(_onScroll);
   }
 
-  Future<void> _fetchUsers() async {
+  Future<void> _fetchUsers([String query = '']) async {
     if (_isFetchingMore) return;
 
     setState(() => _isFetchingMore = true);
     try {
-      QuerySnapshot querySnapshot;
-      if (_lastDocument == null) {
-        // Initial fetch
-        querySnapshot = await _firestore
-            .collection('users')
-            .where('uid', isNotEqualTo: _auth.currentUser!.uid)
-            .orderBy('uid') // Required by Firestore for inequality filter
-            .orderBy('createdAt', descending: true)
-            .limit(_pageSize)
-            .get();
-      } else {
-        // Fetch next page
-        querySnapshot = await _firestore
-            .collection('users')
-            .where('uid', isNotEqualTo: _auth.currentUser!.uid)
-            .orderBy('uid')
-            .orderBy('createdAt', descending: true)
-            .startAfterDocument(_lastDocument!)
-            .limit(_pageSize)
-            .get();
-      }
+      QuerySnapshot querySnapshot = await _firestore
+          .collection('users')
+          .orderBy('createdAt', descending: true)
+          .where('username', isGreaterThanOrEqualTo: query)
+          .where('username', isLessThan: query + 'z')
+          .limit(_pageSize)
+          .get();
 
+      final filteredDocs = querySnapshot.docs.where((doc) => doc['uid'] != _auth.currentUser!.uid).toList();
       if (mounted) {
         setState(() {
           if (_lastDocument == null) {
-            _users = querySnapshot.docs;
+            _users = filteredDocs;
           } else {
-            _users.addAll(querySnapshot.docs);
+            _users.addAll(filteredDocs);
           }
-          // Only set _lastDocument if we fetched exactly _pageSize documents
-          if (querySnapshot.docs.length < _pageSize) {
-            _lastDocument = null; // No more users to fetch
-          } else {
-            _lastDocument = querySnapshot.docs.isNotEmpty ? querySnapshot.docs.last : null;
-          }
+          _lastDocument = filteredDocs.isNotEmpty ? filteredDocs.last : null;
           _isLoading = false;
           _isFetchingMore = false;
         });
@@ -90,7 +74,7 @@ class _ChatPageState extends State<ChatPage> {
     if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent &&
         !_isFetchingMore &&
         _lastDocument != null) {
-      _fetchUsers();
+      _fetchUsers(_searchController.text);
     }
   }
 
@@ -110,6 +94,7 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -117,7 +102,17 @@ class _ChatPageState extends State<ChatPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Messages'),
+        title: InstaTextField(
+          controller: _searchController,
+          hintText: 'Search users...',
+          onChanged: (value) {
+            setState(() {
+              _users.clear();
+              _lastDocument = null;
+              _fetchUsers(value);
+            });
+          },
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -128,7 +123,7 @@ class _ChatPageState extends State<ChatPage> {
                   _lastDocument = null;
                   _isLoading = true;
                 });
-                await _fetchUsers();
+                await _fetchUsers(_searchController.text);
               },
               child: ListView.builder(
                 controller: _scrollController,
