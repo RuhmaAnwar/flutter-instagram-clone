@@ -8,8 +8,9 @@ class InstaTextField extends StatelessWidget {
   final bool obscureText;
   final double? width;
   final Widget? prefixIcon;
+  final Widget? suffixIcon; // Added suffixIcon
   final InputDecoration? decoration;
-  final ValueChanged<String>? onChanged; // Added onChanged callback
+  final ValueChanged<String>? onChanged;
 
   const InstaTextField({
     Key? key,
@@ -18,8 +19,9 @@ class InstaTextField extends StatelessWidget {
     this.obscureText = false,
     this.width,
     this.prefixIcon,
+    this.suffixIcon, // Initialized suffixIcon
     this.decoration,
-    this.onChanged, // Initialized as optional
+    this.onChanged,
   }) : super(key: key);
 
   @override
@@ -48,6 +50,7 @@ class InstaTextField extends StatelessWidget {
             fontSize: fontSize,
           ),
           prefixIcon: prefixIcon,
+          suffixIcon: suffixIcon, // Pass suffixIcon to InputDecoration
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8.r),
             borderSide: BorderSide(
@@ -67,7 +70,7 @@ class InstaTextField extends StatelessWidget {
             ),
           ),
         ),
-        onChanged: onChanged, // Pass the onChanged callback to TextField
+        onChanged: onChanged,
       ),
     );
   }
