@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -10,7 +11,7 @@ import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
-import 'package:photo_view/photo_view.dart'; // Add this dependency for zooming
+import 'package:photo_view/photo_view.dart';
 import '../theme/colors.dart';
 
 class ChatRoomPage extends StatefulWidget {
@@ -19,11 +20,11 @@ class ChatRoomPage extends StatefulWidget {
   final String lastName;
 
   const ChatRoomPage({
-    Key? key,
+    super.key,
     required this.userId,
     required this.firstName,
     required this.lastName,
-  }) : super(key: key);
+  });
 
   @override
   State<ChatRoomPage> createState() => _ChatRoomPageState();
@@ -39,6 +40,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
   bool _isRecording = false;
   String? _audioPath;
+  bool _isOtherUserTyping = false;
+  Timer? _typingTimer;
+  StreamSubscription<DocumentSnapshot>? _typingSubscription;
 
   // Cloudinary credentials
   static const String _cloudinaryApiKey = '944496563675247';
@@ -50,12 +54,28 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     super.initState();
     _initializeRecorder();
     final chatRoomId = _getChatRoomId();
+    // Initialize chat with members field
     _firestore.collection('chats').doc(chatRoomId).set({
-      'isTyping': {
-        _auth.currentUser!.uid: false,
-        widget.userId: false,
-      },
+      'members': [_auth.currentUser!.uid, widget.userId],
+      'isTyping': {_auth.currentUser!.uid: false, widget.userId: false},
+      'lastMessage': '',
+      'lastTimestamp': null,
     }, SetOptions(merge: true));
+
+    // Subscribe to typing status updates
+    _typingSubscription = _firestore
+        .collection('chats')
+        .doc(chatRoomId)
+        .snapshots()
+        .listen((snapshot) {
+          if (snapshot.exists && mounted) {
+            final data = snapshot.data();
+            final isTyping = data?['isTyping'] ?? {};
+            setState(() {
+              _isOtherUserTyping = isTyping[widget.userId] == true;
+            });
+          }
+        });
   }
 
   Future<void> _initializeRecorder() async {
@@ -64,7 +84,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     if (micStatus.isDenied || storageStatus.isDenied) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Microphone and storage permissions are required')),
+          const SnackBar(
+            content: Text('Microphone and storage permissions are required'),
+          ),
         );
       }
       return;
@@ -72,16 +94,19 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     await _recorder.openRecorder();
   }
 
-  String _getChatRoomId() => ([_auth.currentUser!.uid, widget.userId]..sort()).join('_');
+  String _getChatRoomId() =>
+      ([_auth.currentUser!.uid, widget.userId]..sort()).join('_');
 
   void _scrollToBottom() {
-    if (_scrollController.hasClients && _scrollController.position.maxScrollExtent > 0) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<void> _sendMessage() async {
@@ -95,19 +120,30 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
         if (!(await audioFile.exists()) || (await audioFile.length()) == 0) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to upload audio: File not found or empty')),
+              const SnackBar(
+                content: Text(
+                  'Failed to upload audio: File not found or empty',
+                ),
+              ),
             );
           }
           setState(() => _audioPath = null);
           return;
         }
 
-        final url = Uri.parse('https://api.cloudinary.com/v1_1/$_cloudinaryCloudName/upload');
-        final request = http.MultipartRequest('POST', url)
-          ..fields['upload_preset'] = _uploadPreset
-          ..fields['api_key'] = _cloudinaryApiKey
-          ..files.add(await http.MultipartFile.fromPath('file', _audioPath!));
-        final response = await request.send().timeout(const Duration(seconds: 30));
+        final url = Uri.parse(
+          'https://api.cloudinary.com/v1_1/$_cloudinaryCloudName/upload',
+        );
+        final request =
+            http.MultipartRequest('POST', url)
+              ..fields['upload_preset'] = _uploadPreset
+              ..fields['api_key'] = _cloudinaryApiKey
+              ..files.add(
+                await http.MultipartFile.fromPath('file', _audioPath!),
+              );
+        final response = await request.send().timeout(
+          const Duration(seconds: 30),
+        );
         final responseBody = await response.stream.bytesToString();
         final jsonMap = jsonDecode(responseBody);
         if (response.statusCode == 200 && jsonMap['secure_url'] != null) {
@@ -124,21 +160,31 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
         }
       }
 
-      await _firestore.collection('chats').doc(chatRoomId).collection('messages').add({
-        'text': _messageController.text,
-        'senderId': _auth.currentUser!.uid,
-        'receiverId': widget.userId,
-        'timestamp': FieldValue.serverTimestamp(),
-        'seenBy': {_auth.currentUser!.uid: true},
-        'mediaType': mediaType,
-        'mediaUrl': mediaUrl,
-        'isDeletedFor': [],
-      });
+      await _firestore
+          .collection('chats')
+          .doc(chatRoomId)
+          .collection('messages')
+          .add({
+            'text': _messageController.text,
+            'senderId': _auth.currentUser!.uid,
+            'receiverId': widget.userId,
+            'timestamp': FieldValue.serverTimestamp(),
+            'seenBy': {_auth.currentUser!.uid: true},
+            'mediaType': mediaType,
+            'mediaUrl': mediaUrl,
+            'isDeletedFor': [],
+          });
 
-      final currentDoc = await _firestore.collection('chats').doc(chatRoomId).get();
-      final currentIsTyping = currentDoc.data()?['isTyping'] as Map<String, dynamic>? ?? {};
+      final currentDoc =
+          await _firestore.collection('chats').doc(chatRoomId).get();
+      final currentIsTyping =
+          currentDoc.data()?['isTyping'] as Map<String, dynamic>? ?? {};
       await _firestore.collection('chats').doc(chatRoomId).set({
-        'lastMessage': _messageController.text.isNotEmpty ? _messageController.text : 'Audio',
+        'members': [_auth.currentUser!.uid, widget.userId],
+        'lastMessage':
+            _messageController.text.isNotEmpty
+                ? _messageController.text
+                : 'Audio',
         'lastTimestamp': FieldValue.serverTimestamp(),
         'isTyping': {
           _auth.currentUser!.uid: false,
@@ -159,11 +205,16 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       maxWidth: 800,
     );
     if (pickedFile != null) {
-      final url = Uri.parse('https://api.cloudinary.com/v1_1/$_cloudinaryCloudName/upload');
-      final request = http.MultipartRequest('POST', url)
-        ..fields['upload_preset'] = _uploadPreset
-        ..fields['api_key'] = _cloudinaryApiKey
-        ..files.add(await http.MultipartFile.fromPath('file', pickedFile.path));
+      final url = Uri.parse(
+        'https://api.cloudinary.com/v1_1/$_cloudinaryCloudName/upload',
+      );
+      final request =
+          http.MultipartRequest('POST', url)
+            ..fields['upload_preset'] = _uploadPreset
+            ..fields['api_key'] = _cloudinaryApiKey
+            ..files.add(
+              await http.MultipartFile.fromPath('file', pickedFile.path),
+            );
       final response = await request.send();
       if (response.statusCode == 200) {
         final responseData = await response.stream.bytesToString();
@@ -182,18 +233,23 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
   Future<void> _sendMedia(String mediaType, String mediaUrl) async {
     final chatRoomId = _getChatRoomId();
-    await _firestore.collection('chats').doc(chatRoomId).collection('messages').add({
-      'text': '',
-      'senderId': _auth.currentUser!.uid,
-      'receiverId': widget.userId,
-      'timestamp': FieldValue.serverTimestamp(),
-      'seenBy': {_auth.currentUser!.uid: true},
-      'mediaType': mediaType,
-      'mediaUrl': mediaUrl,
-      'isDeletedFor': [],
-    });
+    await _firestore
+        .collection('chats')
+        .doc(chatRoomId)
+        .collection('messages')
+        .add({
+          'text': '',
+          'senderId': _auth.currentUser!.uid,
+          'receiverId': widget.userId,
+          'timestamp': FieldValue.serverTimestamp(),
+          'seenBy': {_auth.currentUser!.uid: true},
+          'mediaType': mediaType,
+          'mediaUrl': mediaUrl,
+          'isDeletedFor': [],
+        });
 
     await _firestore.collection('chats').doc(chatRoomId).set({
+      'members': [_auth.currentUser!.uid, widget.userId],
       'lastMessage': mediaType == 'image' ? 'Image' : 'Audio',
       'lastTimestamp': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
@@ -215,7 +271,8 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       }
 
       final tempDir = await getTemporaryDirectory();
-      _audioPath = '${tempDir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.aac';
+      _audioPath =
+          '${tempDir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.aac';
       final recordedFile = File(recordedPath);
       if (await recordedFile.exists()) {
         await recordedFile.copy(_audioPath!);
@@ -234,97 +291,136 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       setState(() => _isRecording = false);
       _sendMessage();
     } else {
+      setState(() => _audioPath = null);
       final tempDir = await getTemporaryDirectory();
-      _audioPath = '${tempDir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.aac';
+      _audioPath =
+          '${tempDir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.aac';
       await _recorder.startRecorder(toFile: _audioPath, codec: Codec.aacADTS);
       setState(() => _isRecording = true);
     }
+  }
+
+  Future<String> _getAudioDuration(String url) async {
+    try {
+      await _audioPlayer.setSource(UrlSource(url));
+      final duration = await _audioPlayer.getDuration();
+      if (duration != null) {
+        final minutes = duration.inMinutes;
+        final seconds = duration.inSeconds % 60;
+        return '$minutes:${seconds.toString().padLeft(2, '0')}';
+      }
+    } catch (e) {
+      // Handle error silently
+    }
+    return '0:00';
   }
 
   Future<void> _playAudio(String url) async {
     await _audioPlayer.play(UrlSource(url));
   }
 
-  Future<void> _deleteMessage(String messageId, {bool forEveryone = false}) async {
+  Future<void> _deleteMessage(
+    String messageId, {
+    bool forEveryone = false,
+  }) async {
     final chatRoomId = _getChatRoomId();
-    final messageRef = _firestore.collection('chats').doc(chatRoomId).collection('messages').doc(messageId);
-    final messageDoc = await messageRef.get();
-    if (!messageDoc.exists) return;
-
-    final messageData = messageDoc.data()!;
-    final timestamp = (messageData['timestamp'] as Timestamp?)?.toDate();
-    final senderId = messageData['senderId'] as String;
-
-    // Only the sender can delete for everyone, and only within 1 hour of sending
-    if (forEveryone) {
-      if (senderId != _auth.currentUser!.uid) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Only the sender can delete for everyone')),
-        );
-        return;
-      }
-      if (timestamp != null && DateTime.now().difference(timestamp).inHours > 1) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You can only delete for everyone within 1 hour')),
-        );
-        return;
-      }
-      await messageRef.delete();
-      // Update last message in chat room
-      final messagesSnapshot = await _firestore
+    await _firestore.runTransaction((transaction) async {
+      final messageRef = _firestore
           .collection('chats')
           .doc(chatRoomId)
           .collection('messages')
-          .orderBy('timestamp', descending: true)
-          .limit(1)
-          .get();
-      if (messagesSnapshot.docs.isNotEmpty) {
-        final lastMessage = messagesSnapshot.docs.first.data();
-        await _firestore.collection('chats').doc(chatRoomId).update({
-          'lastMessage': lastMessage['text'].isNotEmpty ? lastMessage['text'] : lastMessage['mediaType'] == 'image' ? 'Image' : 'Audio',
-          'lastTimestamp': lastMessage['timestamp'],
-        });
+          .doc(messageId);
+      final messageDoc = await transaction.get(messageRef);
+      if (!messageDoc.exists) return;
+
+      final messageData = messageDoc.data()!;
+      final timestamp = (messageData['timestamp'] as Timestamp?)?.toDate();
+      final senderId = messageData['senderId'] as String? ?? '';
+
+      if (forEveryone) {
+        if (senderId != _auth.currentUser!.uid) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Only the sender can delete for everyone'),
+              ),
+            );
+          }
+          return;
+        }
+        if (timestamp != null &&
+            DateTime.now().difference(timestamp).inHours > 1) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('You can only delete for everyone within 1 hour'),
+              ),
+            );
+          }
+          return;
+        }
+        transaction.delete(messageRef);
+        final messagesSnapshot =
+            await _firestore
+                .collection('chats')
+                .doc(chatRoomId)
+                .collection('messages')
+                .orderBy('timestamp', descending: true)
+                .limit(1)
+                .get();
+        if (messagesSnapshot.docs.isNotEmpty) {
+          final lastMessage = messagesSnapshot.docs.first.data();
+          transaction.update(_firestore.collection('chats').doc(chatRoomId), {
+            'lastMessage':
+                lastMessage['text'].isNotEmpty
+                    ? lastMessage['text']
+                    : lastMessage['mediaType'] == 'image'
+                    ? 'Image'
+                    : 'Audio',
+            'lastTimestamp': lastMessage['timestamp'],
+          });
+        } else {
+          transaction.update(_firestore.collection('chats').doc(chatRoomId), {
+            'lastMessage': '',
+            'lastTimestamp': null,
+          });
+        }
       } else {
-        await _firestore.collection('chats').doc(chatRoomId).update({
-          'lastMessage': '',
-          'lastTimestamp': null,
+        transaction.update(messageRef, {
+          'isDeletedFor': FieldValue.arrayUnion([_auth.currentUser!.uid]),
         });
       }
-    } else {
-      // Delete for self by adding user ID to isDeletedFor list
-      await messageRef.update({
-        'isDeletedFor': FieldValue.arrayUnion([_auth.currentUser!.uid]),
-      });
-    }
+    });
   }
 
   void _showDeleteOptions(String messageId) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Message'),
-        content: const Text('Choose an option:'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _deleteMessage(messageId, forEveryone: false);
-            },
-            child: const Text('Delete for Me'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Message'),
+            content: const Text('Choose an option:'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _deleteMessage(messageId, forEveryone: false);
+                },
+                child: const Text('Delete for Me'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _deleteMessage(messageId, forEveryone: true);
+                },
+                child: const Text('Delete for Everyone'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _deleteMessage(messageId, forEveryone: true);
-            },
-            child: const Text('Delete for Everyone'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -339,10 +435,12 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
   @override
   void dispose() {
+    _typingSubscription?.cancel();
     _scrollController.dispose();
     _messageController.dispose();
     _audioPlayer.dispose();
     _recorder.closeRecorder();
+    _typingTimer?.cancel();
     super.dispose();
   }
 
@@ -358,28 +456,36 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
           style: TextStyle(
             fontSize: 18.sp,
             fontWeight: FontWeight.w600,
-            color: isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+            color:
+                isDarkMode
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimaryLight,
           ),
         ),
-        backgroundColor: isDarkMode ? AppColors.backgroundDark : AppColors.backgroundLight,
+        backgroundColor:
+            isDarkMode ? AppColors.backgroundDark : AppColors.backgroundLight,
       ),
       body: Column(
         children: [
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _firestore
-                  .collection('chats')
-                  .doc(chatRoomId)
-                  .collection('messages')
-                  .orderBy('timestamp', descending: true)
-                  .snapshots(),
+              stream:
+                  _firestore
+                      .collection('chats')
+                      .doc(chatRoomId)
+                      .collection('messages')
+                      .orderBy('timestamp', descending: true)
+                      .limit(50)
+                      .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final messages = snapshot.data!.docs;
                 for (var doc in messages) {
-                  if (doc['senderId'] != _auth.currentUser!.uid && !doc['seenBy'][widget.userId]) {
+                  final seenBy = (doc['seenBy'] as Map<String, dynamic>?) ?? {};
+                  if (doc['senderId'] != _auth.currentUser!.uid &&
+                      !seenBy[widget.userId] == true) {
                     doc.reference.update({'seenBy.${widget.userId}': true});
                   }
                 }
@@ -387,19 +493,28 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                   controller: _scrollController,
                   reverse: true,
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.w,
+                    vertical: 8.h,
+                  ),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final message = messages[index];
-                    final isCurrentUser = message['senderId'] == _auth.currentUser!.uid;
-                    final seenBy = (message['seenBy'] as Map<String, dynamic>?) ?? {};
-                    final isSeen = seenBy[widget.userId] == true && isCurrentUser;
-                    final timestamp = (message['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
+                    final isCurrentUser =
+                        (message['senderId'] as String? ?? '') ==
+                        _auth.currentUser!.uid;
+                    final seenBy =
+                        (message['seenBy'] as Map<String, dynamic>?) ?? {};
+                    final isSeen =
+                        seenBy[widget.userId] == true && isCurrentUser;
+                    final timestamp =
+                        (message['timestamp'] as Timestamp?)?.toDate() ??
+                        DateTime.now();
                     final mediaUrl = message['mediaUrl'] as String?;
-                    final data = message.data() as Map<String, dynamic>;
-                    final isDeletedFor = data.containsKey('isDeletedFor') ? (data['isDeletedFor'] as List<dynamic>?) ?? [] : [];
+                    final mediaType = message['mediaType'] as String? ?? 'text';
+                    final isDeletedFor =
+                        (message['isDeletedFor'] as List<dynamic>?) ?? [];
 
-                    // Skip rendering if message is deleted for the current user
                     if (isDeletedFor.contains(_auth.currentUser!.uid)) {
                       return const SizedBox.shrink();
                     }
@@ -409,62 +524,97 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                       child: Padding(
                         padding: EdgeInsets.symmetric(vertical: 4.h),
                         child: Align(
-                          alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
+                          alignment:
+                              isCurrentUser
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
                           child: Column(
-                            crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            crossAxisAlignment:
+                                isCurrentUser
+                                    ? CrossAxisAlignment.end
+                                    : CrossAxisAlignment.start,
                             children: [
-                              if (message['mediaType'] == 'image')
+                              if (mediaType == 'image' && mediaUrl != null)
                                 GestureDetector(
-                                  onTap: () => _showFullScreenImage(mediaUrl!),
+                                  onTap: () => _showFullScreenImage(mediaUrl),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(12.r),
                                     child: Image.network(
-                                      mediaUrl ?? '',
+                                      mediaUrl,
                                       width: 200.w,
                                       height: 200.h,
                                       fit: BoxFit.cover,
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
+                                      loadingBuilder: (
+                                        context,
+                                        child,
+                                        loadingProgress,
+                                      ) {
+                                        if (loadingProgress == null)
+                                          return child;
                                         return Center(
                                           child: CircularProgressIndicator(
-                                            value: loadingProgress.expectedTotalBytes != null
-                                                ? loadingProgress.cumulativeBytesLoaded /
-                                                    (loadingProgress.expectedTotalBytes ?? 1)
-                                                : null,
+                                            value:
+                                                loadingProgress
+                                                            .expectedTotalBytes !=
+                                                        null
+                                                    ? loadingProgress
+                                                            .cumulativeBytesLoaded /
+                                                        (loadingProgress
+                                                                .expectedTotalBytes ??
+                                                            1)
+                                                    : null,
                                           ),
                                         );
                                       },
-                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.error),
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              Column(
+                                                children: [
+                                                  const Icon(Icons.error),
+                                                  TextButton(
+                                                    onPressed:
+                                                        () => setState(() {}),
+                                                    child: const Text('Retry'),
+                                                  ),
+                                                ],
+                                              ),
                                     ),
                                   ),
                                 ),
-                              if (message['mediaType'] != 'image')
+                              if (mediaType != 'image')
                                 ConstrainedBox(
                                   constraints: BoxConstraints(
-                                    maxWidth: MediaQuery.of(context).size.width * 0.75,
+                                    maxWidth:
+                                        MediaQuery.of(context).size.width *
+                                        0.75,
                                   ),
                                   child: Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 12.w,
+                                      vertical: 8.h,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: isCurrentUser
-                                          ? AppColors.primaryTeal
-                                          : isDarkMode
+                                      color:
+                                          isCurrentUser
+                                              ? AppColors.primaryTeal
+                                              : isDarkMode
                                               ? AppColors.greyDark
                                               : AppColors.greyLight,
                                       border: Border.all(
-                                        color: isCurrentUser
-                                            ? AppColors.primaryTeal
-                                            : isDarkMode
+                                        color:
+                                            isCurrentUser
+                                                ? AppColors.primaryTeal
+                                                : isDarkMode
                                                 ? AppColors.greyBorderDark
                                                 : AppColors.greyBorderLight,
                                         width: 1.5.w,
                                       ),
                                       borderRadius: BorderRadius.circular(12.r),
                                     ),
-                                    child: Column(
-                                      crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                    child: Wrap(
                                       children: [
-                                        if (message['mediaType'] == 'audio')
+                                        if (mediaType == 'audio' &&
+                                            mediaUrl != null)
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
@@ -472,43 +622,66 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                                                 icon: Icon(
                                                   Icons.play_arrow,
                                                   size: 24.sp,
-                                                  color: isCurrentUser
-                                                      ? Colors.white
-                                                      : isDarkMode
-                                                          ? AppColors.greyBorderDark
-                                                          : AppColors.greyBorderLight,
+                                                  color:
+                                                      isCurrentUser
+                                                          ? Colors.white
+                                                          : isDarkMode
+                                                          ? AppColors
+                                                              .greyBorderDark
+                                                          : AppColors
+                                                              .greyBorderLight,
                                                 ),
-                                                onPressed: () => _playAudio(mediaUrl!),
+                                                onPressed:
+                                                    () => _playAudio(mediaUrl),
                                                 padding: EdgeInsets.zero,
                                                 constraints: BoxConstraints(),
                                               ),
                                               SizedBox(width: 8.w),
-                                              Text(
-                                                '1:02',
-                                                style: TextStyle(
-                                                  color: isCurrentUser
-                                                      ? Colors.white
-                                                      : isDarkMode
-                                                          ? AppColors.textPrimaryDark
-                                                          : AppColors.textPrimaryLight,
-                                                  fontSize: 14.sp,
+                                              FutureBuilder<String>(
+                                                future: _getAudioDuration(
+                                                  mediaUrl,
                                                 ),
+                                                builder: (context, snapshot) {
+                                                  return Text(
+                                                    snapshot.data ?? '0:00',
+                                                    style: TextStyle(
+                                                      color:
+                                                          isCurrentUser
+                                                              ? Colors.white
+                                                              : isDarkMode
+                                                              ? AppColors
+                                                                  .textPrimaryDark
+                                                              : AppColors
+                                                                  .textPrimaryLight,
+                                                      fontSize: 14.sp,
+                                                    ),
+                                                  );
+                                                },
                                               ),
                                             ],
                                           ),
-                                        if (message['text'] != null && message['text'].isNotEmpty)
+                                        if (message['text'] != null &&
+                                            (message['text'] as String)
+                                                .isNotEmpty)
                                           Padding(
-                                            padding: EdgeInsets.only(top: message['mediaType'] != 'text' ? 8.h : 0),
+                                            padding: EdgeInsets.only(
+                                              top:
+                                                  mediaType != 'text' ? 8.h : 0,
+                                            ),
                                             child: Text(
-                                              message['text'],
+                                              message['text'] as String,
                                               style: TextStyle(
-                                                color: isCurrentUser
-                                                    ? Colors.white
-                                                    : isDarkMode
-                                                        ? AppColors.textPrimaryDark
-                                                        : AppColors.textPrimaryLight,
+                                                color:
+                                                    isCurrentUser
+                                                        ? Colors.white
+                                                        : isDarkMode
+                                                        ? AppColors
+                                                            .textPrimaryDark
+                                                        : AppColors
+                                                            .textPrimaryLight,
                                                 fontSize: 14.sp,
                                               ),
+                                              softWrap: true,
                                             ),
                                           ),
                                       ],
@@ -526,9 +699,10 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                                     'Seen at ${timestamp.toLocal().toString().substring(0, 16)}',
                                     style: TextStyle(
                                       fontSize: 10.sp,
-                                      color: isCurrentUser
-                                          ? Colors.white70
-                                          : isDarkMode
+                                      color:
+                                          isCurrentUser
+                                              ? Colors.white70
+                                              : isDarkMode
                                               ? AppColors.greyBorderDark
                                               : AppColors.greyBorderLight,
                                     ),
@@ -545,41 +719,33 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
             ),
           ),
           Container(
-            color: isDarkMode ? AppColors.backgroundDark : AppColors.backgroundLight,
+            color:
+                isDarkMode
+                    ? AppColors.backgroundDark
+                    : AppColors.backgroundLight,
             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
             child: SafeArea(
               child: Column(
                 children: [
-                  StreamBuilder<DocumentSnapshot>(
-                    stream: _firestore.collection('chats').doc(chatRoomId).snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.hasData) {
-                        final data = snapshot.data!.data() as Map<String, dynamic>?;
-                        final isTyping = data?['isTyping'] as Map<String, dynamic>?;
-                        final isOtherUserTyping = isTyping?[widget.userId] == true;
-                        if (isOtherUserTyping) {
-                          return Padding(
-                            padding: EdgeInsets.only(bottom: 8.h),
-                            child: Row(
-                              children: [
-                                Text(
-                                  'Typing...',
-                                  style: TextStyle(
-                                    fontSize: 12.sp,
-                                    color: isDarkMode
-                                        ? AppColors.greyBorderDark
-                                        : AppColors.greyBorderLight,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                              ],
+                  if (_isOtherUserTyping)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: 8.h),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Typing...',
+                            style: TextStyle(
+                              fontSize: 12.sp,
+                              color:
+                                  isDarkMode
+                                      ? AppColors.greyBorderDark
+                                      : AppColors.greyBorderLight,
+                              fontStyle: FontStyle.italic,
                             ),
-                          );
-                        }
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
+                          ),
+                        ],
+                      ),
+                    ),
                   Row(
                     children: [
                       Expanded(
@@ -588,77 +754,107 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                           decoration: InputDecoration(
                             hintText: 'Type a message or emoji...',
                             hintStyle: TextStyle(
-                              color: isDarkMode
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
+                              color:
+                                  isDarkMode
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
                               fontSize: 14.sp,
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8.r),
                               borderSide: BorderSide(
-                                color: isDarkMode
-                                    ? AppColors.greyBorderDark
-                                    : AppColors.greyBorderLight,
-                                width: 1.5.w,
+                                color:
+                                    isDarkMode
+                                        ? AppColors.greyBorderDark
+                                        : AppColors.greyBorderLight,
+                                width: 1.0.w,
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8.r),
                               borderSide: BorderSide(
-                                color: isDarkMode
-                                    ? AppColors.greyBorderDark
-                                    : AppColors.greyBorderLight,
+                                color:
+                                    isDarkMode
+                                        ? AppColors.greyBorderDark
+                                        : AppColors.greyBorderLight,
                                 width: 1.5.w,
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8.r),
                               borderSide: BorderSide(
-                                color: isDarkMode
-                                    ? AppColors.greyBorderDark
-                                    : AppColors.greyBorderLight,
+                                color:
+                                    isDarkMode
+                                        ? AppColors.greyBorderDark
+                                        : AppColors.greyBorderLight,
                                 width: 1.5.w,
                               ),
                             ),
                             filled: true,
-                            fillColor: isDarkMode ? AppColors.greyDark : AppColors.greyLight,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 13.5.h),
-                            suffixIcon: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: Icon(
-                                    Icons.image,
-                                    size: 24.sp,
-                                    color: AppColors.primaryTeal,
+                            fillColor:
+                                isDarkMode
+                                    ? AppColors.greyBorderDark
+                                    : AppColors.greyBorderLight,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 15.w,
+                              vertical: 13.5.h,
+                            ),
+                            suffixIcon: Padding(
+                              padding: EdgeInsets.only(right: 8.w),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.image,
+                                      size: 24.sp,
+                                      color: AppColors.primaryTeal,
+                                    ),
+                                    onPressed: _pickImage,
                                   ),
-                                  onPressed: _pickImage,
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    _isRecording ? Icons.stop : Icons.mic,
-                                    size: 24.sp,
-                                    color: AppColors.primaryTeal,
+                                  IconButton(
+                                    icon: Icon(
+                                      _isRecording ? Icons.stop : Icons.mic,
+                                      size: 24.sp,
+                                      color: AppColors.primaryTeal,
+                                    ),
+                                    onPressed: _toggleRecording,
                                   ),
-                                  onPressed: _toggleRecording,
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                           style: TextStyle(
                             fontSize: 14.sp,
-                            color: isDarkMode
-                                ? AppColors.textPrimaryDark
-                                : AppColors.textPrimaryLight,
+                            color:
+                                isDarkMode
+                                    ? AppColors.textPrimaryDark
+                                    : AppColors.textPrimaryLight,
                           ),
                           onChanged: (value) {
-                            final chatRoomId = _getChatRoomId();
-                            _firestore.collection('chats').doc(chatRoomId).set({
-                              'isTyping': {
-                                _auth.currentUser!.uid: value.isNotEmpty,
-                                widget.userId: false,
+                            _typingTimer?.cancel();
+                            _typingTimer = Timer(
+                              const Duration(milliseconds: 500),
+                              () {
+                                final chatRoomId = _getChatRoomId();
+                                _firestore
+                                    .collection('chats')
+                                    .doc(chatRoomId)
+                                    .set({
+                                      'members': [
+                                        _auth.currentUser!.uid,
+                                        widget.userId,
+                                      ],
+                                      'isTyping': {
+                                        _auth.currentUser!.uid:
+                                            value.isNotEmpty,
+                                      },
+                                    }, SetOptions(merge: true));
+                                print(
+                                  'Typing status updated for ${_auth.currentUser!.uid}: ${value.isNotEmpty}',
+                                );
                               },
-                            }, SetOptions(merge: true));
+                            );
                           },
                         ),
                       ),
@@ -671,7 +867,11 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                           onTap: _sendMessage,
                           child: Container(
                             padding: EdgeInsets.all(8.w),
-                            child: Icon(Icons.send, size: 24.sp, color: Colors.white),
+                            child: Icon(
+                              Icons.send,
+                              size: 24.sp,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
@@ -690,14 +890,15 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 class FullScreenImage extends StatelessWidget {
   final String imageUrl;
 
-  const FullScreenImage({Key? key, required this.imageUrl}) : super(key: key);
+  const FullScreenImage({super.key, required this.imageUrl});
 
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? AppColors.backgroundDark : AppColors.backgroundLight,
+      backgroundColor:
+          isDarkMode ? AppColors.backgroundDark : AppColors.backgroundLight,
       body: Stack(
         children: [
           Center(
@@ -707,7 +908,10 @@ class FullScreenImage extends StatelessWidget {
               maxScale: PhotoViewComputedScale.covered * 2,
               initialScale: PhotoViewComputedScale.contained,
               backgroundDecoration: BoxDecoration(
-                color: isDarkMode ? AppColors.backgroundDark : AppColors.backgroundLight,
+                color:
+                    isDarkMode
+                        ? AppColors.backgroundDark
+                        : AppColors.backgroundLight,
               ),
             ),
           ),
@@ -715,7 +919,11 @@ class FullScreenImage extends StatelessWidget {
             top: 40.h,
             left: 16.w,
             child: IconButton(
-              icon: Icon(Icons.close, size: 28.sp, color: isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+              icon: Icon(
+                Icons.close,
+                size: 28.sp,
+                color: isDarkMode ? AppColors.textPrimaryDark : Colors.white,
+              ),
               onPressed: () => Navigator.pop(context),
             ),
           ),
