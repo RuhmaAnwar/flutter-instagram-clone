@@ -1,9 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:video_player/video_player.dart';
+import 'package:flutter_instagram_clone/main_screens/post_preview.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../theme/colors.dart';
 
 class AddPost extends StatefulWidget {
@@ -13,36 +14,25 @@ class AddPost extends StatefulWidget {
   State<AddPost> createState() => _AddPostState();
 }
 
-class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
+class _AddPostState extends State<AddPost> {
   late List<CameraDescription> _cameras;
   CameraController? _cameraController;
-  VideoPlayerController? _videoController;
-  late AnimationController _pulseController;
-
   File? _mediaFile;
-  bool _isVideo = false;
-  bool _isRecording = false;
-  bool _cameraReady = false;
   String? _error;
+  bool _cameraReady = false;
+  bool _showCamera = false;
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-      lowerBound: 1.0,
-      upperBound: 1.2,
-    )..repeat(reverse: true);
     _initializeCamera();
+    print('AddPost initialized');
   }
 
   Future<void> _initializeCamera() async {
     final cameraPermission = await Permission.camera.request();
-    final micPermission = await Permission.microphone.request();
-
-    if (!cameraPermission.isGranted || !micPermission.isGranted) {
-      setState(() => _error = "Camera or microphone permission not granted.");
+    if (!cameraPermission.isGranted) {
+      setState(() => _error = "Camera permission not granted.");
       return;
     }
 
@@ -53,6 +43,9 @@ class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
   }
 
   Future<void> _startCamera(CameraDescription camera) async {
+    // Check if the widget is still mounted before proceeding
+    if (!mounted) return;
+
     setState(() => _cameraReady = false);
 
     if (_cameraController != null) {
@@ -64,11 +57,13 @@ class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
 
     try {
       await controller.initialize();
+      if (!mounted) return; // Check mounted again after async operation
       setState(() {
         _cameraController = controller;
         _cameraReady = true;
       });
     } catch (e) {
+      if (!mounted) return; // Avoid setting state if disposed
       setState(() => _error = "Camera init error: $e");
     }
   }
@@ -77,46 +72,16 @@ class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
     if (!_cameraReady || _cameraController == null) return;
     try {
       final file = await _cameraController!.takePicture();
+      if (!mounted) return; // Check mounted before setting state
       setState(() {
         _mediaFile = File(file.path);
-        _isVideo = false;
+        _showCamera = false;
       });
+      _navigateToPreview();
     } catch (e) {
+      if (!mounted) return; // Avoid setting state if disposed
       setState(() => _error = "Photo error: $e");
     }
-  }
-
-  Future<void> _startVideoRecording() async {
-    if (!_cameraReady || _cameraController == null) return;
-    try {
-      await _cameraController!.startVideoRecording();
-      setState(() => _isRecording = true);
-    } catch (e) {
-      setState(() => _error = "Video start error: $e");
-    }
-  }
-
-  Future<void> _stopVideoRecording() async {
-    if (!_isRecording || _cameraController == null) return;
-    try {
-      final file = await _cameraController!.stopVideoRecording();
-      setState(() {
-        _mediaFile = File(file.path);
-        _isVideo = true;
-        _isRecording = false;
-      });
-      await _initializeVideoPlayer(_mediaFile!);
-    } catch (e) {
-      setState(() => _error = "Video stop error: $e");
-    }
-  }
-
-  Future<void> _initializeVideoPlayer(File file) async {
-    _videoController?.dispose();
-    _videoController = VideoPlayerController.file(file);
-    await _videoController!.initialize();
-    _videoController!.play();
-    setState(() {});
   }
 
   Future<void> _pickFromGallery() async {
@@ -124,17 +89,11 @@ class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
     final picked = await picker.pickImage(source: ImageSource.gallery);
 
     if (picked != null) {
-      final file = File(picked.path);
-      final isVideo = picked.path.endsWith('.mp4') || picked.path.endsWith('.mov');
-
+      if (!mounted) return; // Check mounted before setting state
       setState(() {
-        _mediaFile = file;
-        _isVideo = isVideo;
+        _mediaFile = File(picked.path);
       });
-
-      if (isVideo) {
-        await _initializeVideoPlayer(file);
-      }
+      _navigateToPreview();
     }
   }
 
@@ -147,136 +106,182 @@ class _AddPostState extends State<AddPost> with SingleTickerProviderStateMixin {
     await _startCamera(_cameras[nextIndex]);
   }
 
+  void _navigateToPreview() {
+    if (_mediaFile != null) {
+      print('Navigating to PostPreviewScreen');
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PostPreviewScreen(mediaFile: _mediaFile!),
+        ),
+      ).then((_) {
+        if (!mounted) return; // Check mounted before setting state
+        setState(() {
+          _mediaFile = null;
+          _showCamera = false;
+        });
+      });
+    }
+  }
+
+  Future<void> _showMediaSourceDialog() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Media Source'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Camera'),
+              onTap: () {
+                Navigator.pop(context);
+                if (mounted) setState(() => _showCamera = true);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickFromGallery();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _cameraController?.dispose();
-    _videoController?.dispose();
-    _pulseController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final borderScale = _isRecording ? _pulseController.value : 1.0;
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       body: SafeArea(
-        child: Stack(
-          children: [
-            if (_mediaFile == null && _cameraReady)
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  if (!_cameraController!.value.isInitialized) {
-                    return Container(
-                      color: Theme.of(context).colorScheme.background,
-                    );
-                  }
-
-                  final previewSize = _cameraController!.value.previewSize!;
-                  final screenRatio = constraints.maxWidth / constraints.maxHeight;
-                  final previewRatio = previewSize.height / previewSize.width;
-
-                  return Transform.scale(
-                    scale: screenRatio / previewRatio,
-                    child: Center(
-                      child: AspectRatio(
-                        aspectRatio: previewRatio,
-                        child: CameraPreview(_cameraController!),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            if (_mediaFile != null)
-              Center(
-                child: _isVideo
-                    ? (_videoController != null && _videoController!.value.isInitialized)
-                        ? AspectRatio(
-                            aspectRatio: _videoController!.value.aspectRatio,
-                            child: VideoPlayer(_videoController!),
-                          )
-                        : const CircularProgressIndicator()
-                    : Image.file(_mediaFile!),
-              ),
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 40),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 80,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Gallery Icon
-                      Positioned(
-                        left: 30,
-                        child: IconButton(
-                          icon: Icon(
-                            Icons.photo_library,
-                            color: isDarkMode ? Colors.white : AppColors.textPrimaryLight,
+        child: _showCamera && _cameraReady && _cameraController != null
+            ? Stack(
+                children: [
+                  CameraPreview(_cameraController!),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 40.h),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.flip_camera_android,
+                              color: isDarkMode ? Colors.white : AppColors.textPrimaryLight,
+                              size: 30.sp,
+                            ),
+                            onPressed: _flipCamera,
                           ),
-                          onPressed: _pickFromGallery,
-                        ),
-                      ),
-
-                      // Capture Button
-                      GestureDetector(
-                        onTap: _takePhoto,
-                        onLongPress: _startVideoRecording,
-                        onLongPressUp: _stopVideoRecording,
-                        child: ShaderMask(
-                          shaderCallback: (Rect bounds) {
-                            return AppColors.primaryGradient.createShader(bounds);
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            width: 70 * borderScale,
-                            height: 70 * borderScale,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isDarkMode ? Colors.white : AppColors.textPrimaryLight,
-                                width: 4,
+                          GestureDetector(
+                            onTap: _takePhoto,
+                            child: Container(
+                              width: 70.w,
+                              height: 70.h,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isDarkMode ? Colors.white : AppColors.textPrimaryLight,
+                                  width: 4.w,
+                                ),
+                              ),
+                              child: Center(
+                                child: Container(
+                                  width: 50.w,
+                                  height: 50.h,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                          const SizedBox(width: 30),
+                        ],
                       ),
-
-                      // Flip Camera Icon
-                      Positioned(
-                        right: 30,
-                        child: IconButton(
-                          icon: Icon(
-                            Icons.flip_camera_android,
-                            color: isDarkMode ? Colors.white : AppColors.textPrimaryLight,
-                          ),
-                          onPressed: _flipCamera,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-            ),
-
-            if (_error != null)
-              Positioned(
-                top: 20,
-                left: 20,
-                right: 20,
-                child: Text(
-                  _error!,
-                  style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                        color: Theme.of(context).colorScheme.error,
+                  if (_error != null)
+                    Positioned(
+                      top: 20.h,
+                      left: 20.w,
+                      right: 20.w,
+                      child: Text(
+                        _error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontSize: 14.sp,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                  textAlign: TextAlign.center,
+                    ),
+                ],
+              )
+            : Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    GestureDetector(
+                      onTap: _showMediaSourceDialog,
+                      child: Container(
+                        width: 343.w,
+                        height: 200.h,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: isDarkMode ? Colors.white : AppColors.textPrimaryLight,
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(8.r),
+                          color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.add_a_photo,
+                              size: 50.sp,
+                              color: isDarkMode ? Colors.white : AppColors.textPrimaryLight,
+                            ),
+                            SizedBox(height: 10.h),
+                            Text(
+                              'Add your Post!!!',
+                              style: TextStyle(
+                                fontSize: 16.sp,
+                                color: isDarkMode ? Colors.white : AppColors.textPrimaryLight,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (_error != null)
+                      Padding(
+                        padding: EdgeInsets.only(top: 20.h),
+                        child: Text(
+                          _error!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 14.sp,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-          ],
-        ),
       ),
     );
   }

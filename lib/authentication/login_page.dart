@@ -33,90 +33,92 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    double logoFontSize = 64.sp; // Responsive font size 
+    double logoFontSize = 64.sp; // Responsive font size
     return Scaffold(
       body: SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(height: 120.h,),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 96.w,),
-                  child: Text(
-                    'Vivir',
-                    style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                          color: Theme.of(context).colorScheme.onPrimary,
-                          fontFamily: 'Pacifico',
-                          fontSize: logoFontSize, // Responsive font size
-                        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(height: 120.h),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 96.w),
+                child: Text(
+                  'Vivir',
+                  style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    fontFamily: 'Pacifico',
+                    fontSize: logoFontSize, // Responsive font size
                   ),
                 ),
-                SizedBox(height: 42.h),
-          
-                // Email & username textfield
-                InstaTextField(
-                  controller: _emailController,
-                  hintText: 'Email ',
-                ),
-      
-                SizedBox(height: 12.h),
-          
-                // Password textfield
-                InstaTextField(
-                  controller: _passwordController,
-                  hintText: 'Password',
-                  obscureText: true,
-                ),
+              ),
+              SizedBox(height: 42.h),
 
-                SizedBox(height: 19.h),
+              // Email & username textfield
+              InstaTextField(controller: _emailController, hintText: 'Email '),
 
-                // Forgot password
-                Padding(
-                  padding: EdgeInsets.only(left: 253.w, right: 16.w),
-                  child: GestureDetector(
-                    onTap: () {
-                      // Forgot Password Screen
-                    },
-                    child: Text(
-                      'Forgot password?',
-                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            color: Theme.of(context).colorScheme.onSecondaryFixed,
-                            fontSize: 12.sp,
-                          ),
+              SizedBox(height: 12.h),
+
+              // Password textfield
+              InstaTextField(
+                controller: _passwordController,
+                hintText: 'Password',
+                obscureText: true,
+              ),
+
+              SizedBox(height: 19.h),
+
+              // Forgot password
+              Padding(
+                padding: EdgeInsets.only(left: 253.w, right: 16.w),
+                child: GestureDetector(
+                  onTap: () {
+                    // Forgot Password Screen
+                  },
+                  child: Text(
+                    'Forgot password?',
+                    style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                      color: Theme.of(context).colorScheme.onSecondaryFixed,
+                      fontSize: 12.sp,
                     ),
                   ),
                 ),
+              ),
 
-                SizedBox(height: 30.h),
-          
-                // Login button
-                InstaButton(
-                  text: 'Log in',
-                  isFilled: true,
-                  onPressed: () {
-                    logIn();
-                  },
-                ),
-                SizedBox(height: 12.h),
-          
-                SizedBox(
-                  height: 44.h,
-                  width: 343.w,
-                  child: OutlinedButton(
+              SizedBox(height: 30.h),
+
+              // Login button
+              InstaButton(
+                text: 'Log in',
+                isFilled: true,
+                onPressed: () {
+                  logIn();
+                },
+              ),
+              SizedBox(height: 12.h),
+
+              SizedBox(
+                height: 44.h,
+                width: 343.w,
+                child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(
-                      color: Theme.of(context).colorScheme.onSurface, // border color
+                      color:
+                          Theme.of(
+                            context,
+                          ).colorScheme.onSurface, // border color
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.r), // rounded corners
+                      borderRadius: BorderRadius.circular(
+                        8.r,
+                      ), // rounded corners
                     ),
                   ),
                   onPressed: () {
                     // Handle Google sign-in
                   },
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center , 
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Image.asset(
                         'lib/assets/images/google_logo.png',
@@ -127,76 +129,65 @@ class _LoginPageState extends State<LoginPage> {
                       Text(
                         'Continue with Google',
                         style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontSize: 14.sp,
-                            ),
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 14.sp,
+                        ),
                       ),
                     ],
                   ),
-                                ),
                 ),
+              ),
 
-                
-                SizedBox(height: 12.h),
-          
-                // Create new account
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "Don't have an account? ",
-                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            color: Theme.of(context).colorScheme.onSecondaryFixed,
-                            fontSize: 14.sp,
-                          ),
+              SizedBox(height: 12.h),
+
+              // Create new account
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "Don't have an account? ",
+                    style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                      color: Theme.of(context).colorScheme.onSecondaryFixed,
+                      fontSize: 14.sp,
                     ),
-                    GestureDetector(
-                      onTap: () {
-                        // signup
-                        Navigator.push(
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      // signup
+                      Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => SignupPage()),
-                       );
-                      },
-                      child: Text(
-                        'Sign up',
-                        style: Theme.of(context).textTheme.displayLarge!.copyWith(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontSize: 14.sp,
-                            ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 40.h),
-
-                // Debug login button
-                 Padding(
-                  padding: EdgeInsets.only(bottom: 24.h),
-                  child: TextButton(
-                    onPressed: () {
-                      _emailController.text = "ruhma@gmail.com";
-                      _passwordController.text = "password123";
-                      logIn();
+                      );
                     },
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.red,
-                    ),
                     child: Text(
-                      'Debug Login',
-                      style: TextStyle(
-                        fontSize: 12.sp,
+                      'Sign up',
+                      style: Theme.of(context).textTheme.displayLarge!.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 14.sp,
                       ),
                     ),
                   ),
-                ),
+                ],
+              ),
+              SizedBox(height: 40.h),
 
-                
-              ],
-            ),
+              // Debug login button
+              Padding(
+                padding: EdgeInsets.only(bottom: 24.h),
+                child: TextButton(
+                  onPressed: () {
+                    _emailController.text = "ruhma@gmail.com";
+                    _passwordController.text = "password123";
+                    logIn();
+                  },
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: Text('Debug Login', style: TextStyle(fontSize: 12.sp)),
+                ),
+              ),
+            ],
           ),
         ),
-      
+      ),
     );
   }
 }

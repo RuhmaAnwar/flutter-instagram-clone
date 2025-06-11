@@ -18,8 +18,8 @@ void main() async {
         designSize: const Size(375, 812),
         minTextAdapt: true,
         splitScreenMode: true,
-        child: const MyApp()
-        ),
+        child: const MyApp(),
+      ),
     ),
   );
 }
@@ -47,6 +47,7 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeProvider.themeMode,
+      routes: {'/login': (context) => const LoginPage()},
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
